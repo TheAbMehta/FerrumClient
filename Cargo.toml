@@ -1,3 +1,23 @@
 [workspace]
-members = ["ferrum-meshing-gpu"]
+members = [
+    "ferrum-core",
+    "ferrum-protocol",
+    "ferrum-meshing-cpu",
+    "ferrum-meshing-gpu",
+    "ferrum-render",
+    "ferrum-world",
+    "ferrum-physics",
+    "ferrum-entity",
+    "ferrum-inventory",
+    "ferrum-assets",
+    "ferrum-config",
+    "ferrum-subprocess",
+    "ferrum",
+]
 resolver = "2"
+
+[workspace.dependencies]
+bevy = "0.18"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+criterion = "0.5"
