@@ -1,0 +1,25 @@
+[client]
+render_distance = 16
+fov = 70.0
+fps_limit = 144
+vsync = true
+
+[server]
+address = "localhost:25565"
+auto_start = false
+
+[assets]
+source = "mojang"
+cache_dir = "~/.ferrum/cache"
+
+[keybindings]
+forward = "W"
+back = "S"
+left = "A"
+right = "D"
+jump = "Space"
+sneak = "LShift"
+sprint = "LControl"
+inventory = "E"
+drop = "Q"
+chat = "T"
