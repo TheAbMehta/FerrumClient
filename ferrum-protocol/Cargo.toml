@@ -4,3 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+azalea-protocol = { git = "https://github.com/azalea-rs/azalea", branch = "main" }
+thiserror = "2.0"
+
+[dev-dependencies]
+tokio = { workspace = true }
