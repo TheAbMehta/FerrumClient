@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bevy = { workspace = true }
+ferrum-config = { path = "../ferrum-config" }
+ferrum-subprocess = { path = "../ferrum-subprocess" }
+tokio = { workspace = true }
