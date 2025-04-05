@@ -1,6 +1,15 @@
 [package]
 name = "ferrum-meshing-cpu"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+description = "CPU binary greedy meshing for voxel chunks"
 
 [dependencies]
+ferrum-meshing-gpu = { path = "../ferrum-meshing-gpu" }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "chunk_meshing"
+harness = false
