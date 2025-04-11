@@ -1,8 +1,7 @@
 [client]
 render_distance = 16
 fov = 70.0
-fps_limit = 144
-vsync = true
+vsync = false
 
 [server]
 address = "localhost:25565"
