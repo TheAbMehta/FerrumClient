@@ -4,3 +4,11 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+bevy = { workspace = true }
+image = "0.25"
+ferrum-assets = { path = "../ferrum-assets" }
+ferrum-meshing-cpu = { path = "../ferrum-meshing-cpu" }
+thiserror = "2.0"
+
+[dev-dependencies]
+tokio = { workspace = true }
