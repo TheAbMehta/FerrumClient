@@ -1,5 +1,6 @@
-use ferrum_render::{TextureAtlas, BlockRenderer, RenderError};
+use ferrum_render::{TextureAtlas, BlockRenderer};
 use ferrum_meshing_cpu::{ChunkMesh, MeshQuad, Face};
+use bevy::mesh::{Indices, VertexAttributeValues};
 
 #[tokio::test]
 async fn test_texture_atlas_creation() {
@@ -54,9 +55,9 @@ fn test_chunk_mesh_to_bevy_mesh() {
     let bevy_mesh = BlockRenderer::create_mesh(&chunk_mesh, &atlas);
     
     // Mesh should have position, normal, and UV attributes
-    assert!(bevy_mesh.attribute(bevy::render::mesh::Mesh::ATTRIBUTE_POSITION).is_some());
-    assert!(bevy_mesh.attribute(bevy::render::mesh::Mesh::ATTRIBUTE_NORMAL).is_some());
-    assert!(bevy_mesh.attribute(bevy::render::mesh::Mesh::ATTRIBUTE_UV_0).is_some());
+    assert!(bevy_mesh.attribute(bevy::prelude::Mesh::ATTRIBUTE_POSITION).is_some());
+    assert!(bevy_mesh.attribute(bevy::prelude::Mesh::ATTRIBUTE_NORMAL).is_some());
+    assert!(bevy_mesh.attribute(bevy::prelude::Mesh::ATTRIBUTE_UV_0).is_some());
 }
 
 #[test]
@@ -67,9 +68,9 @@ fn test_empty_chunk_mesh() {
     let bevy_mesh = BlockRenderer::create_mesh(&chunk_mesh, &atlas);
     
     // Empty mesh should have no vertices
-    if let Some(positions) = bevy_mesh.attribute(bevy::render::mesh::Mesh::ATTRIBUTE_POSITION) {
+    if let Some(positions) = bevy_mesh.attribute(bevy::prelude::Mesh::ATTRIBUTE_POSITION) {
         match positions {
-            bevy::render::mesh::VertexAttributeValues::Float32x3(verts) => {
+            VertexAttributeValues::Float32x3(verts) => {
                 assert_eq!(verts.len(), 0);
             }
             _ => panic!("Expected Float32x3 positions"),
@@ -95,9 +96,9 @@ fn test_quad_generates_correct_vertex_count() {
     let bevy_mesh = BlockRenderer::create_mesh(&chunk_mesh, &atlas);
     
     // Should have 4 vertices for the quad
-    if let Some(positions) = bevy_mesh.attribute(bevy::render::mesh::Mesh::ATTRIBUTE_POSITION) {
+    if let Some(positions) = bevy_mesh.attribute(bevy::prelude::Mesh::ATTRIBUTE_POSITION) {
         match positions {
-            bevy::render::mesh::VertexAttributeValues::Float32x3(verts) => {
+            VertexAttributeValues::Float32x3(verts) => {
                 assert_eq!(verts.len(), 4);
             }
             _ => panic!("Expected Float32x3 positions"),
@@ -107,7 +108,7 @@ fn test_quad_generates_correct_vertex_count() {
     // Should have 6 indices (2 triangles)
     if let Some(indices) = bevy_mesh.indices() {
         match indices {
-            bevy::render::mesh::Indices::U32(idx) => {
+            Indices::U32(idx) => {
                 assert_eq!(idx.len(), 6);
             }
             _ => panic!("Expected U32 indices"),

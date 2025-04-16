@@ -1,7 +1,7 @@
 use crate::texture_atlas::TextureAtlas;
 use bevy::asset::RenderAssetUsages;
+use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
-use bevy::render::mesh::Indices;
 use ferrum_meshing_cpu::{ChunkMesh, Face};
 
 pub struct BlockRenderer;
@@ -96,7 +96,7 @@ impl BlockRenderer {
         }
 
         let mut mesh = Mesh::new(
-            bevy::render::mesh::PrimitiveTopology::TriangleList,
+            PrimitiveTopology::TriangleList,
             RenderAssetUsages::MAIN_WORLD | RenderAssetUsages::RENDER_WORLD,
         );
 
