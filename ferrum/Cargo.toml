@@ -6,5 +6,9 @@ edition = "2021"
 [dependencies]
 bevy = { workspace = true }
 ferrum-config = { path = "../ferrum-config" }
+ferrum-protocol = { path = "../ferrum-protocol" }
 ferrum-subprocess = { path = "../ferrum-subprocess" }
 tokio = { workspace = true }
+azalea-protocol = { git = "https://github.com/azalea-rs/azalea" }
+uuid = "1"
+thiserror = "2.0"

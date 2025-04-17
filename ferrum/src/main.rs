@@ -1,3 +1,5 @@
+mod network;
+
 use bevy::prelude::*;
 use ferrum_config::{Config, ConfigPlugin};
 use ferrum_subprocess::PumpkinServer;
