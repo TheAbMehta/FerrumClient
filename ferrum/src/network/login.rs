@@ -1,7 +1,9 @@
-use super::ConnectionError;
+use super::{ConnectionError, MinecraftConnection};
+use std::net::SocketAddr;
 
 pub async fn perform_login(
-    username: String,
+    address: SocketAddr,
 ) -> Result<(), ConnectionError> {
-    Ok(())
+    let conn = MinecraftConnection::new(address);
+    conn.connect().await
 }
