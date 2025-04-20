@@ -4,3 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ferrum-core = { path = "../ferrum-core" }
+glam = "0.30"
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "physics"
+harness = false
