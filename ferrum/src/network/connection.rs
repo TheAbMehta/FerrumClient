@@ -6,7 +6,7 @@ use azalea_protocol::packets::handshake::{
     s_intention::ServerboundIntention,
 };
 use azalea_protocol::packets::login::{
-    ClientboundLoginPacket, ServerboundLoginPacket,
+    ClientboundLoginPacket,
     s_hello::ServerboundHello,
 };
 use azalea_protocol::packets::{ClientIntention, PROTOCOL_VERSION};

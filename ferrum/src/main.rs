@@ -18,7 +18,7 @@ fn main() {
         .add_plugins(ConfigPlugin {
             config_path: "config.toml".into(),
         })
-        .add_systems(Startup, auto_start_pumpkin)
+        .add_systems(Startup, (auto_start_pumpkin, connect_to_server).chain())
         .run();
 }
 
@@ -40,4 +40,35 @@ fn auto_start_pumpkin(config: Res<Config>) {
                 std::mem::forget(server);
             });
     }
+}
+
+fn connect_to_server(config: Res<Config>) {
+    info!("Connecting to Minecraft server at {}...", config.server.address);
+    
+    tokio::runtime::Runtime::new()
+        .expect("Failed to create tokio runtime")
+        .block_on(async {
+            let addr = match network::perform_handshake(
+                config.server.address.clone(),
+                25565,
+            ).await {
+                Ok(addr) => {
+                    info!("Handshake successful, resolved address: {}", addr);
+                    addr
+                }
+                Err(e) => {
+                    warn!("Handshake failed: {}. Skipping server connection.", e);
+                    return;
+                }
+            };
+            
+            match network::perform_login(addr).await {
+                Ok(_) => {
+                    info!("Successfully connected and logged in to server!");
+                }
+                Err(e) => {
+                    warn!("Login failed: {}. Continuing without server connection.", e);
+                }
+            }
+        });
 }
