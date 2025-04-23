@@ -182,21 +182,44 @@ fn test_player_aabb() {
 
 #[test]
 fn test_ground_collision_detection() {
-    let mut player = Player::new(Vec3::new(0.0, 1.0, 0.0));
+    let mut player = Player::new(Vec3::new(0.0, -0.5, 0.0));
     player.set_velocity(Vec3::new(0.0, -1.0, 0.0));
 
     let ground = Aabb::new(Vec3::new(-5.0, -1.0, -5.0), Vec3::new(5.0, 0.0, 5.0));
 
+    let player_aabb = player.aabb();
+    println!(
+        "Player AABB: min={:?}, max={:?}",
+        player_aabb.min(),
+        player_aabb.max()
+    );
+    println!(
+        "Ground AABB: min={:?}, max={:?}",
+        ground.min(),
+        ground.max()
+    );
+
     let collision = player.check_collision(&ground);
+    println!("Collision: {}", collision);
     assert!(collision);
 }
 
 #[test]
 fn test_block_collision_resolution() {
-    let mut player = Player::new(Vec3::new(0.0, 1.0, 0.0));
+    let mut player = Player::new(Vec3::new(0.0, 0.0, 0.0));
     player.set_velocity(Vec3::new(1.0, 0.0, 0.0));
 
-    let block = Aabb::new(Vec3::new(0.5, 0.0, -0.5), Vec3::new(1.5, 1.0, 0.5));
+    let block = Aabb::new(Vec3::new(0.2, 0.0, -0.5), Vec3::new(1.5, 1.0, 0.5));
+
+    let player_aabb = player.aabb();
+    println!(
+        "Player AABB: min={:?}, max={:?}",
+        player_aabb.min(),
+        player_aabb.max()
+    );
+    println!("Block AABB: min={:?}, max={:?}", block.min(), block.max());
+    println!("Collision before: {}", player.check_collision(&block));
+    println!("Velocity before: {:?}", player.velocity());
 
     assert!(player.velocity().x > 0.0);
 
@@ -204,6 +227,7 @@ fn test_block_collision_resolution() {
         player.resolve_collision(&block);
     }
 
+    println!("Velocity after: {:?}", player.velocity());
     assert_eq!(player.velocity().x, 0.0);
 }
 
@@ -241,6 +265,5 @@ fn test_sprint_speed_multiplier() {
 
 #[test]
 fn test_gravity_constant() {
-    // Minecraft gravity is -32 m/s² (or blocks/s²)
     assert_eq!(GRAVITY, -32.0);
 }
