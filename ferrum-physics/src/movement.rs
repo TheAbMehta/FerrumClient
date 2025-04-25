@@ -15,7 +15,7 @@ const SPRINT_MULTIPLIER: f32 = 1.3;
 const FRICTION: f32 = 0.546;
 
 impl MovementInput {
-    pub fn calculate_velocity(&self, current_velocity: Vec3, on_ground: bool, dt: f32) -> Vec3 {
+    pub fn calculate_velocity(&self, current_velocity: Vec3, on_ground: bool, _dt: f32) -> Vec3 {
         if !on_ground {
             return current_velocity;
         }

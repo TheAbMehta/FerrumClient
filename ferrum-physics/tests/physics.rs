@@ -187,20 +187,7 @@ fn test_ground_collision_detection() {
 
     let ground = Aabb::new(Vec3::new(-5.0, -1.0, -5.0), Vec3::new(5.0, 0.0, 5.0));
 
-    let player_aabb = player.aabb();
-    println!(
-        "Player AABB: min={:?}, max={:?}",
-        player_aabb.min(),
-        player_aabb.max()
-    );
-    println!(
-        "Ground AABB: min={:?}, max={:?}",
-        ground.min(),
-        ground.max()
-    );
-
     let collision = player.check_collision(&ground);
-    println!("Collision: {}", collision);
     assert!(collision);
 }
 
@@ -211,23 +198,12 @@ fn test_block_collision_resolution() {
 
     let block = Aabb::new(Vec3::new(0.2, 0.0, -0.5), Vec3::new(1.5, 1.0, 0.5));
 
-    let player_aabb = player.aabb();
-    println!(
-        "Player AABB: min={:?}, max={:?}",
-        player_aabb.min(),
-        player_aabb.max()
-    );
-    println!("Block AABB: min={:?}, max={:?}", block.min(), block.max());
-    println!("Collision before: {}", player.check_collision(&block));
-    println!("Velocity before: {:?}", player.velocity());
-
     assert!(player.velocity().x > 0.0);
 
     if player.check_collision(&block) {
         player.resolve_collision(&block);
     }
 
-    println!("Velocity after: {:?}", player.velocity());
     assert_eq!(player.velocity().x, 0.0);
 }
 
