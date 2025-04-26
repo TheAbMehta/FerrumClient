@@ -4,3 +4,5 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ferrum-core = { path = "../ferrum-core" }
+glam = "0.29"
