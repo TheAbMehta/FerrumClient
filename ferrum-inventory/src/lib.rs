@@ -11,10 +11,14 @@
 //! inventory.add_item(stone);
 //! ```
 
+mod combat;
+mod crafting;
 mod inventory;
 mod item_stack;
 mod slot;
 
+pub use combat::{attack, Health, Weapon};
+pub use crafting::{CraftingTable, Recipe};
 pub use inventory::Inventory;
 pub use item_stack::ItemStack;
 pub use slot::Slot;
