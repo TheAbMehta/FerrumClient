@@ -8,6 +8,7 @@ bevy = { workspace = true }
 ferrum-config = { path = "../ferrum-config" }
 ferrum-protocol = { path = "../ferrum-protocol" }
 ferrum-subprocess = { path = "../ferrum-subprocess" }
+ferrum-world = { path = "../ferrum-world" }
 tokio = { workspace = true }
 azalea-protocol = { git = "https://github.com/azalea-rs/azalea" }
 uuid = "1"
