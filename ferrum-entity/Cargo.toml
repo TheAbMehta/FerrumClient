@@ -4,3 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+azalea-core = { git = "https://github.com/azalea-rs/azalea" }
+azalea-registry = { git = "https://github.com/azalea-rs/azalea" }
+uuid = { version = "1", features = ["v4"] }
