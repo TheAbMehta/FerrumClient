@@ -6,10 +6,13 @@ edition = "2021"
 [dependencies]
 bevy = { workspace = true }
 ferrum-config = { path = "../ferrum-config" }
+ferrum-entity = { path = "../ferrum-entity" }
 ferrum-protocol = { path = "../ferrum-protocol" }
 ferrum-subprocess = { path = "../ferrum-subprocess" }
 ferrum-world = { path = "../ferrum-world" }
 tokio = { workspace = true }
+azalea-core = { git = "https://github.com/azalea-rs/azalea" }
 azalea-protocol = { git = "https://github.com/azalea-rs/azalea" }
-uuid = "1"
+azalea-registry = { git = "https://github.com/azalea-rs/azalea" }
+uuid = { version = "1", features = ["v4"] }
 thiserror = "2.0"
