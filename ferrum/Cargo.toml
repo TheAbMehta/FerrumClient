@@ -7,12 +7,15 @@ edition = "2021"
 bevy = { workspace = true }
 ferrum-config = { path = "../ferrum-config" }
 ferrum-entity = { path = "../ferrum-entity" }
+ferrum-physics = { path = "../ferrum-physics" }
 ferrum-protocol = { path = "../ferrum-protocol" }
 ferrum-subprocess = { path = "../ferrum-subprocess" }
 ferrum-world = { path = "../ferrum-world" }
 tokio = { workspace = true }
 azalea-core = { git = "https://github.com/azalea-rs/azalea" }
+azalea-entity = { git = "https://github.com/azalea-rs/azalea" }
 azalea-protocol = { git = "https://github.com/azalea-rs/azalea" }
 azalea-registry = { git = "https://github.com/azalea-rs/azalea" }
+glam = "0.30"
 uuid = { version = "1", features = ["v4"] }
 thiserror = "2.0"
