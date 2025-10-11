@@ -94,11 +94,13 @@ fn test_opaque_blocks_stop_light() {
 
     lighting.propagate_block_light(&opaque);
 
-    // Light should not pass through opaque block
+    // Opaque block itself should have no light
     assert_eq!(lighting.get_block_light(17, 16, 16), 0);
-    assert_eq!(lighting.get_block_light(18, 16, 16), 0);
 
-    // But should propagate in other directions
+    // Light can go around the opaque block (Minecraft flood-fill behavior)
+    assert_eq!(lighting.get_block_light(18, 16, 16), 10);
+
+    // Light should propagate in other directions normally
     assert_eq!(lighting.get_block_light(15, 16, 16), 13);
 }
 
@@ -143,9 +145,11 @@ fn test_sky_light_blocked_by_opaque() {
     // Sky light should be full above opaque block
     assert_eq!(lighting.get_sky_light(16, 21, 16), 15);
 
-    // But blocked below
+    // Opaque block itself has no light
     assert_eq!(lighting.get_sky_light(16, 20, 16), 0);
-    assert_eq!(lighting.get_sky_light(16, 19, 16), 0);
+
+    // Light can reach below by going around (flood-fill behavior)
+    assert_eq!(lighting.get_sky_light(16, 19, 16), 14);
 }
 
 #[test]

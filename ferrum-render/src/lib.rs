@@ -1,7 +1,9 @@
 mod block_renderer;
+pub mod lighting;
 mod texture_atlas;
 
 pub use block_renderer::BlockRenderer;
+pub use lighting::LightingEngine;
 pub use texture_atlas::TextureAtlas;
 
 use thiserror::Error;

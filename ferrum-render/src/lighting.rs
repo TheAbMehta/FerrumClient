@@ -152,13 +152,13 @@ impl LightingEngine {
     }
 
     pub fn get_smooth_light(&self, x: usize, y: usize, z: usize, _face: usize) -> u8 {
-        let x1 = (x + 1).min(CHUNK_SIZE - 1);
-        let y1 = (y + 1).min(CHUNK_SIZE - 1);
+        let x0 = x.saturating_sub(1);
+        let y0 = y.saturating_sub(1);
 
-        let l0 = self.get_combined_light(x, y, z);
-        let l1 = self.get_combined_light(x1, y, z);
-        let l2 = self.get_combined_light(x, y1, z);
-        let l3 = self.get_combined_light(x1, y1, z);
+        let l0 = self.get_combined_light(x0, y0, z);
+        let l1 = self.get_combined_light(x, y0, z);
+        let l2 = self.get_combined_light(x0, y, z);
+        let l3 = self.get_combined_light(x, y, z);
 
         ((l0 as u32 + l1 as u32 + l2 as u32 + l3 as u32) / 4) as u8
     }
