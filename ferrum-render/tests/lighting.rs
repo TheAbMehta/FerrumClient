@@ -242,3 +242,187 @@ fn test_light_propagation_is_symmetric() {
     assert_eq!(light_pz, 13);
     assert_eq!(light_nz, 13);
 }
+
+// ============================================================================
+// AMBIENT OCCLUSION TESTS
+// ============================================================================
+
+#[test]
+fn test_ao_fully_occluded_corner() {
+    let mut lighting = LightingEngine::new();
+    let mut opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // Create a fully occluded corner at (16, 16, 16)
+    // For a corner to be fully occluded, all 3 adjacent blocks must be opaque
+    opaque[17][16][16] = true; // +X neighbor
+    opaque[16][17][16] = true; // +Y neighbor
+    opaque[17][17][16] = true; // +X+Y diagonal
+
+    // Test corner 0 of face Right (which checks +X, +Y, and +X+Y neighbors)
+    let ao = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, 0, 0);
+
+    // Fully occluded corner should have minimum AO (darkest)
+    assert_eq!(ao, 0.0);
+}
+
+#[test]
+fn test_ao_unoccluded_corner() {
+    let lighting = LightingEngine::new();
+    let opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // No opaque blocks around (16, 16, 16)
+    // Test all corners of all faces
+    for face in 0..6 {
+        for corner in 0..4 {
+            let ao =
+                lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, face, corner);
+            // Unoccluded corner should have maximum AO (brightest)
+            assert_eq!(
+                ao, 1.0,
+                "Face {} corner {} should be fully lit",
+                face, corner
+            );
+        }
+    }
+}
+
+#[test]
+fn test_ao_partially_occluded_one_side() {
+    let mut lighting = LightingEngine::new();
+    let mut opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // Place one opaque block adjacent
+    opaque[17][16][16] = true; // +X neighbor
+
+    // Test corner that checks this neighbor
+    let ao = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, 0, 0);
+
+    // One side occluded: AO should be between 0.0 and 1.0
+    assert!(
+        ao > 0.0 && ao < 1.0,
+        "AO should be partially occluded, got {}",
+        ao
+    );
+    assert_eq!(ao, 0.75); // 3/4 neighbors are clear
+}
+
+#[test]
+fn test_ao_partially_occluded_two_sides() {
+    let mut lighting = LightingEngine::new();
+    let mut opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // Place two opaque blocks adjacent (but not diagonal)
+    opaque[17][16][16] = true; // +X neighbor
+    opaque[16][17][16] = true; // +Y neighbor
+
+    let ao = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, 0, 0);
+
+    // Two sides occluded
+    assert!(
+        ao > 0.0 && ao < 1.0,
+        "AO should be partially occluded, got {}",
+        ao
+    );
+    assert_eq!(ao, 0.5); // 2/4 neighbors are clear
+}
+
+#[test]
+fn test_ao_diagonal_occlusion() {
+    let mut lighting = LightingEngine::new();
+    let mut opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // Place only diagonal block (no side blocks)
+    opaque[17][17][16] = true; // +X+Y diagonal
+
+    let ao = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, 0, 0);
+
+    // Diagonal occlusion should have less impact than side occlusion
+    assert!(
+        ao > 0.5 && ao < 1.0,
+        "Diagonal occlusion should be subtle, got {}",
+        ao
+    );
+    assert_eq!(ao, 0.75); // Only 1/4 neighbors occluded
+}
+
+#[test]
+fn test_ao_values_in_valid_range() {
+    let mut lighting = LightingEngine::new();
+    let mut opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // Create random occlusion pattern
+    opaque[17][16][16] = true;
+    opaque[16][17][16] = true;
+    opaque[16][16][17] = true;
+    opaque[15][16][16] = true;
+
+    // Test all faces and corners
+    for face in 0..6 {
+        for corner in 0..4 {
+            let ao =
+                lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, face, corner);
+            assert!(
+                ao >= 0.0 && ao <= 1.0,
+                "AO value {} out of range [0.0, 1.0] for face {} corner {}",
+                ao,
+                face,
+                corner
+            );
+        }
+    }
+}
+
+#[test]
+fn test_ao_different_faces_different_neighbors() {
+    let mut lighting = LightingEngine::new();
+    let mut opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // Occlude only +X direction
+    opaque[17][16][16] = true;
+
+    // Face Right (0) should be affected
+    let ao_right = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, 0, 0);
+
+    // Face Left (1) should not be affected (checks -X direction)
+    let ao_left = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, 1, 0);
+
+    assert!(ao_right < 1.0, "Right face should be occluded");
+    assert_eq!(ao_left, 1.0, "Left face should be unoccluded");
+}
+
+#[test]
+fn test_ao_boundary_blocks() {
+    let lighting = LightingEngine::new();
+    let opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // Test corners at chunk boundaries (should not panic)
+    let ao_min = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 0, 0, 0, 0, 0);
+    let ao_max = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 31, 31, 31, 0, 0);
+
+    // Boundary blocks with no opaque neighbors should be fully lit
+    assert!(ao_min >= 0.0 && ao_min <= 1.0);
+    assert!(ao_max >= 0.0 && ao_max <= 1.0);
+}
+
+#[test]
+fn test_ao_integration_with_lighting() {
+    let mut lighting = LightingEngine::new();
+    let mut opaque = [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE];
+
+    // Set up a lit area with occlusion
+    lighting.set_block_light(16, 16, 16, 14);
+    opaque[17][16][16] = true;
+
+    lighting.propagate_block_light(&opaque);
+
+    // Get both light and AO values
+    let light = lighting.get_combined_light(16, 16, 16);
+    let ao = lighting.calculate_ambient_occlusion_with_opaque(&opaque, 16, 16, 16, 0, 0);
+
+    // Both should be valid
+    assert!(light > 0);
+    assert!(ao >= 0.0 && ao <= 1.0);
+
+    // AO should darken the corner even if lit
+    assert!(ao < 1.0, "Corner should be darkened by occlusion");
+}

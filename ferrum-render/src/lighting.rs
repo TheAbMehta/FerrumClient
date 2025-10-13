@@ -5,6 +5,7 @@ pub const CHUNK_SIZE: usize = 32;
 pub struct LightingEngine {
     block_light: [[[u8; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
     sky_light: [[[u8; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
+    opaque: [[[bool; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
 }
 
 impl LightingEngine {
@@ -12,7 +13,22 @@ impl LightingEngine {
         Self {
             block_light: [[[0; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
             sky_light: [[[0; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
+            opaque: [[[false; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
         }
+    }
+
+    pub fn set_opaque(&mut self, x: usize, y: usize, z: usize, is_opaque: bool) {
+        if x >= CHUNK_SIZE || y >= CHUNK_SIZE || z >= CHUNK_SIZE {
+            return;
+        }
+        self.opaque[x][y][z] = is_opaque;
+    }
+
+    pub fn get_opaque(&self, x: usize, y: usize, z: usize) -> bool {
+        if x >= CHUNK_SIZE || y >= CHUNK_SIZE || z >= CHUNK_SIZE {
+            return false;
+        }
+        self.opaque[x][y][z]
     }
 
     pub fn get_block_light(&self, x: usize, y: usize, z: usize) -> u8 {
@@ -161,6 +177,81 @@ impl LightingEngine {
         let l3 = self.get_combined_light(x, y, z);
 
         ((l0 as u32 + l1 as u32 + l2 as u32 + l3 as u32) / 4) as u8
+    }
+
+    pub fn calculate_ambient_occlusion_with_opaque(
+        &self,
+        opaque: &[[[bool; CHUNK_SIZE]; CHUNK_SIZE]; CHUNK_SIZE],
+        x: usize,
+        y: usize,
+        z: usize,
+        face: usize,
+        corner: usize,
+    ) -> f32 {
+        let (dx1, dy1, dz1, dx2, dy2, dz2, dx3, dy3, dz3) = match (face, corner) {
+            (0, 0) => (1, 0, 0, 0, 1, 0, 1, 1, 0),
+            (0, 1) => (1, 0, 0, 0, 0, 1, 1, 0, 1),
+            (0, 2) => (1, 0, 0, 0, 1, 0, 1, 1, 0),
+            (0, 3) => (1, 0, 0, 0, 0, 1, 1, 0, 1),
+            (1, 0) => (-1, 0, 0, 0, 0, 1, -1, 0, 1),
+            (1, 1) => (-1, 0, 0, 0, 0, -1, -1, 0, -1),
+            (1, 2) => (-1, 0, 0, 0, 1, 0, -1, 1, 0),
+            (1, 3) => (-1, 0, 0, 0, 1, 0, -1, 1, 0),
+            (2, 0) => (0, 0, 1, 0, 1, 0, 0, 1, 1),
+            (2, 1) => (0, 0, 1, 1, 0, 0, 1, 0, 1),
+            (2, 2) => (0, 0, 1, 0, 1, 0, 0, 1, 1),
+            (2, 3) => (0, 0, 1, -1, 0, 0, -1, 0, 1),
+            (3, 0) => (0, 0, -1, 1, 0, 0, 1, 0, -1),
+            (3, 1) => (0, 0, -1, 0, 0, -1, 0, 0, -1),
+            (3, 2) => (0, 0, -1, 0, 1, 0, 0, 1, -1),
+            (3, 3) => (0, 0, -1, -1, 0, 0, -1, 0, -1),
+            (4, 0) => (0, 1, 0, 0, 0, 1, 0, 1, 1),
+            (4, 1) => (0, 1, 0, 1, 0, 0, 1, 1, 0),
+            (4, 2) => (0, 1, 0, 0, 0, 1, 0, 1, 1),
+            (4, 3) => (0, 1, 0, -1, 0, 0, -1, 1, 0),
+            (5, 0) => (0, -1, 0, 0, 0, 1, 0, -1, 1),
+            (5, 1) => (0, -1, 0, 1, 0, 0, 1, -1, 0),
+            (5, 2) => (0, -1, 0, 0, 0, -1, 0, -1, -1),
+            (5, 3) => (0, -1, 0, -1, 0, 0, -1, -1, 0),
+            _ => return 1.0,
+        };
+
+        let check_opaque = |dx: i32, dy: i32, dz: i32| -> bool {
+            let nx = (x as i32 + dx) as usize;
+            let ny = (y as i32 + dy) as usize;
+            let nz = (z as i32 + dz) as usize;
+
+            if nx >= CHUNK_SIZE || ny >= CHUNK_SIZE || nz >= CHUNK_SIZE {
+                return false;
+            }
+
+            opaque[nx][ny][nz]
+        };
+
+        let side1 = check_opaque(dx1, dy1, dz1);
+        let side2 = check_opaque(dx2, dy2, dz2);
+        let diagonal = check_opaque(dx3, dy3, dz3);
+
+        let occluded_count = (side1 as u32) + (side2 as u32) + (diagonal as u32);
+
+        if side1 && side2 && diagonal {
+            0.0
+        } else if side1 && side2 {
+            0.5
+        } else {
+            1.0 - (occluded_count as f32 / 4.0)
+        }
+    }
+
+    pub fn calculate_ambient_occlusion(
+        &self,
+        x: usize,
+        y: usize,
+        z: usize,
+        face: usize,
+        corner: usize,
+    ) -> f32 {
+        self.calculate_ambient_occlusion_with_opaque(&self.opaque, x, y, z, face, corner)
     }
 }
 
