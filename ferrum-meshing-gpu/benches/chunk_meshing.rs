@@ -33,11 +33,38 @@ fn bench_terrain(c: &mut Criterion) {
     });
 }
 
+fn bench_gpu_dispatch_terrain(c: &mut Criterion) {
+    let mesher = GpuChunkMesher::new().expect("Failed to create GPU mesher");
+    let chunk = terrain_chunk();
+    c.bench_function("gpu_dispatch_terrain", |b| {
+        b.iter(|| mesher.mesh_chunk_gpu(black_box(&chunk)))
+    });
+}
+
+fn bench_gpu_dispatch_uniform_stone(c: &mut Criterion) {
+    let mesher = GpuChunkMesher::new().expect("Failed to create GPU mesher");
+    let chunk = uniform_chunk(1);
+    c.bench_function("gpu_dispatch_uniform_stone", |b| {
+        b.iter(|| mesher.mesh_chunk_gpu(black_box(&chunk)))
+    });
+}
+
+fn bench_gpu_dispatch_checkerboard(c: &mut Criterion) {
+    let mesher = GpuChunkMesher::new().expect("Failed to create GPU mesher");
+    let chunk = checkerboard_chunk(1);
+    c.bench_function("gpu_dispatch_checkerboard", |b| {
+        b.iter(|| mesher.mesh_chunk_gpu(black_box(&chunk)))
+    });
+}
+
 criterion_group!(
     benches,
     bench_uniform_air,
     bench_uniform_stone,
     bench_checkerboard,
-    bench_terrain
+    bench_terrain,
+    bench_gpu_dispatch_terrain,
+    bench_gpu_dispatch_uniform_stone,
+    bench_gpu_dispatch_checkerboard,
 );
 criterion_main!(benches);
