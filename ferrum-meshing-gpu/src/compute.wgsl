@@ -1,16 +1,14 @@
-// GPU 2D Greedy Meshing Compute Shader
+// GPU 2D Greedy Meshing Compute Shader — Batch Processing
 //
-// Two-pass architecture:
-//   Pass 1 (face_culling): Binary face mask generation using bitwise ops.
-//     Dispatch (4, 6, 1) @ workgroup_size(256) = 1024 threads per face.
-//     Each thread builds one 32-bit column mask using opaque & ~(opaque << 1).
-//     Output: face_mask_buf[face * 1024 + layer * 32 + row]
+// Supports N chunks per dispatch via wgid.z as chunk index.
+// Buffers are laid out as arrays indexed by chunk_id:
+//   voxels:        [chunk_id * 32768 + voxel_index]
+//   face_mask_buf: [chunk_id * 6144 + face * 1024 + layer * 32 + row]
+//   quads:         [chunk_id * MAX_QUADS * 2 + quad_idx * 2]
+//   quad_count:    [chunk_id]
 //
-//   Pass 2 (greedy_merge): Full 2D greedy merge per (face, layer) slice.
-//     Dispatch (32, 6, 1) @ workgroup_size(32).
-//     Thread 0 runs the complete 2D greedy algorithm (forward+right merge)
-//     on the 32x32 slice using bit manipulation. Other threads help flush
-//     the per-workgroup quad buffer to global memory.
+// Pass 1 (face_culling): Dispatch (4, 6, N) @ workgroup_size(256)
+// Pass 2 (greedy_merge): Dispatch (32, 6, N) @ workgroup_size(32)
 //
 // Quad packing (2x u32):
 //   word0: x(5) | y(5) | z(5) | w(5) | h(5) | face(3) | padding(4)
@@ -22,6 +20,7 @@ const CHUNK_SIZE: u32 = 32u;
 const CHUNK_SIZE_SQ: u32 = 1024u;
 const CHUNK_SIZE_CB: u32 = 32768u;
 const MAX_QUADS: u32 = 65536u;
+const FACE_MASK_STRIDE: u32 = 6144u; // 6 * 1024
 
 @group(0) @binding(0)
 var<storage, read> voxels: array<u32>;
@@ -30,25 +29,16 @@ var<storage, read> voxels: array<u32>;
 var<storage, read_write> quads: array<u32>;
 
 @group(0) @binding(2)
-var<storage, read_write> quad_count: atomic<u32>;
+var<storage, read_write> quad_counts: array<atomic<u32>>;
 
-// Intermediate face mask buffer: 6 faces * 1024 entries = 6144 u32s
 @group(0) @binding(3)
 var<storage, read_write> face_mask_buf: array<u32>;
 
-fn voxel_index(x: u32, y: u32, z: u32) -> u32 {
-    return z * CHUNK_SIZE_SQ + y * CHUNK_SIZE + x;
+fn voxel_index(chunk: u32, x: u32, y: u32, z: u32) -> u32 {
+    return chunk * CHUNK_SIZE_CB + z * CHUNK_SIZE_SQ + y * CHUNK_SIZE + x;
 }
 
-// ============================================================================
-// Coordinate mapping for face directions
-// ============================================================================
-// Mask layout: face_mask_buf[face * 1024 + layer * 32 + row]
-//   Face 0,1 (+X,-X): layer=z, row=y, bits=x
-//   Face 2,3 (+Y,-Y): layer=z, row=x, bits=y
-//   Face 4,5 (+Z,-Z): layer=y, row=x, bits=z
-
-fn get_block_for_face(face: u32, layer: u32, row: u32, bit: u32) -> u32 {
+fn get_block_for_face(chunk: u32, face: u32, layer: u32, row: u32, bit: u32) -> u32 {
     var x: u32; var y: u32; var z: u32;
     switch face {
         case 0u, 1u: { x = bit; y = row; z = layer; }
@@ -56,7 +46,7 @@ fn get_block_for_face(face: u32, layer: u32, row: u32, bit: u32) -> u32 {
         case 4u, 5u: { x = row; y = layer; z = bit; }
         default:     { x = 0u; y = 0u; z = 0u; }
     }
-    return voxels[voxel_index(x, y, z)];
+    return voxels[voxel_index(chunk, x, y, z)];
 }
 
 fn face_quad_xyz(face: u32, layer: u32, row_start: u32, bit: u32) -> vec3<u32> {
@@ -69,8 +59,6 @@ fn face_quad_xyz(face: u32, layer: u32, row_start: u32, bit: u32) -> vec3<u32> {
 }
 
 fn face_quad_wh(face: u32, width_along_bit: u32, length_along_row: u32) -> vec2<u32> {
-    // width_along_bit = extent along the bit axis
-    // length_along_row = extent along the row axis
     switch face {
         case 0u, 1u: { return vec2<u32>(width_along_bit, length_along_row); }
         case 2u, 3u: { return vec2<u32>(length_along_row, width_along_bit); }
@@ -82,15 +70,14 @@ fn face_quad_wh(face: u32, width_along_bit: u32, length_along_row: u32) -> vec2<
 // ============================================================================
 // Pass 1: Face Culling — Binary face mask generation
 // ============================================================================
-// Dispatch: (4, 6, 1) with workgroup_size(256)
-// 4 * 256 = 1024 threads per face, 6 face directions.
-// Each thread handles one (layer, row) column and builds a 32-bit mask.
+// Dispatch: (4, 6, N) with workgroup_size(256)
 
 @compute @workgroup_size(256, 1, 1)
 fn face_culling(
     @builtin(local_invocation_id) lid: vec3<u32>,
     @builtin(workgroup_id) wgid: vec3<u32>,
 ) {
+    let chunk = wgid.z;
     let face = wgid.y;
     let col_idx = lid.x + wgid.x * 256u;
     if col_idx >= CHUNK_SIZE_SQ {
@@ -100,19 +87,13 @@ fn face_culling(
     let layer = col_idx / CHUNK_SIZE;
     let row = col_idx % CHUNK_SIZE;
 
-    // Build opaque column mask: bit i set if block at depth i is non-air
     var opaque: u32 = 0u;
     for (var depth: u32 = 0u; depth < CHUNK_SIZE; depth = depth + 1u) {
-        if get_block_for_face(face, layer, row, depth) != 0u {
+        if get_block_for_face(chunk, face, layer, row, depth) != 0u {
             opaque = opaque | (1u << depth);
         }
     }
 
-    // Derive face mask using binary ops:
-    // +dir (face 0,2,4): exposed at depth d if solid at d and air at d+1
-    //   = opaque & ~(opaque << 1)  (bit 31 naturally exposed)
-    // -dir (face 1,3,5): exposed at depth d if solid at d and air at d-1
-    //   = opaque & ~(opaque >> 1)  (bit 0 naturally exposed)
     var mask: u32;
     if (face & 1u) == 0u {
         mask = opaque & ~(opaque << 1u);
@@ -120,18 +101,14 @@ fn face_culling(
         mask = opaque & ~(opaque >> 1u);
     }
 
-    face_mask_buf[face * CHUNK_SIZE_SQ + layer * CHUNK_SIZE + row] = mask;
+    face_mask_buf[chunk * FACE_MASK_STRIDE + face * CHUNK_SIZE_SQ + layer * CHUNK_SIZE + row] = mask;
 }
 
 // ============================================================================
 // Pass 2: 2D Greedy Merge
 // ============================================================================
-// Dispatch: (32, 6, 1) with workgroup_size(32)
-// Each workgroup handles one (face, layer) pair = one 32x32 slice.
-// Thread 0 runs the full 2D greedy merge algorithm (ported from CPU code).
-// Other 31 threads assist with flushing quads to global memory.
+// Dispatch: (32, 6, N) with workgroup_size(32)
 
-// Per-workgroup quad buffer (max 512 quads per slice, 2 words each)
 var<workgroup> wg_quads: array<u32, 1024>;
 var<workgroup> wg_count: atomic<u32>;
 var<workgroup> wg_base: u32;
@@ -141,8 +118,9 @@ fn greedy_merge(
     @builtin(local_invocation_id) lid: vec3<u32>,
     @builtin(workgroup_id) wgid: vec3<u32>,
 ) {
-    let layer = wgid.x;  // depth slice (0..31)
-    let face = wgid.y;   // face direction (0..5)
+    let layer = wgid.x;
+    let face = wgid.y;
+    let chunk = wgid.z;
 
     if lid.x == 0u {
         atomicStore(&wg_count, 0u);
@@ -150,18 +128,14 @@ fn greedy_merge(
 
     workgroupBarrier();
 
-    // Thread 0 performs the full 2D greedy merge for this slice.
-    // Algorithm: identical to CPU binary_greedy.rs merge_face().
-    // For each row (0..31), scan bits, try forward merge to next row,
-    // then right merge along bit axis. Emit merged quads.
     if lid.x == 0u {
-        // Load masks into private registers
+        let mask_base = chunk * FACE_MASK_STRIDE + face * CHUNK_SIZE_SQ + layer * CHUNK_SIZE;
+
         var masks: array<u32, 32>;
         for (var i: u32 = 0u; i < 32u; i = i + 1u) {
-            masks[i] = face_mask_buf[face * CHUNK_SIZE_SQ + layer * CHUNK_SIZE + i];
+            masks[i] = face_mask_buf[mask_base + i];
         }
 
-        // Forward merge counters per bit position
         var fwd: array<u32, 32>;
         for (var i: u32 = 0u; i < 32u; i = i + 1u) {
             fwd[i] = 0u;
@@ -180,21 +154,18 @@ fn greedy_merge(
 
             while bits != 0u {
                 let bit_pos = countTrailingZeros(bits);
-                let block = get_block_for_face(face, layer, row, bit_pos);
+                let block = get_block_for_face(chunk, face, layer, row, bit_pos);
 
-                // Forward merge: if next row has same bit set with same block type,
-                // increment forward counter and skip emission.
-                // Cap at 30 so length (fwd+1) stays <= 31 (5-bit packing limit).
+                // Forward merge (cap at 30 so length <= 31 for 5-bit packing)
                 if fwd[bit_pos] < 30u
                     && (next_bits & (1u << bit_pos)) != 0u
-                    && block == get_block_for_face(face, layer, row + 1u, bit_pos) {
+                    && block == get_block_for_face(chunk, face, layer, row + 1u, bit_pos) {
                     fwd[bit_pos] = fwd[bit_pos] + 1u;
                     bits = bits & ~(1u << bit_pos);
                     continue;
                 }
 
-                // Right merge: extend along bit axis while same block type
-                // and same forward merge count. Cap at 31 (5-bit packing limit).
+                // Right merge (cap at 31 for 5-bit packing)
                 var right_count: u32 = 1u;
                 var next_bit = bit_pos + 1u;
                 while next_bit < CHUNK_SIZE && right_count < 31u {
@@ -204,16 +175,14 @@ fn greedy_merge(
                     if fwd[bit_pos] != fwd[next_bit] {
                         break;
                     }
-                    if block != get_block_for_face(face, layer, row, next_bit) {
+                    if block != get_block_for_face(chunk, face, layer, row, next_bit) {
                         break;
                     }
-                    // Consume this bit and reset its forward counter
                     fwd[next_bit] = 0u;
                     right_count = right_count + 1u;
                     next_bit = next_bit + 1u;
                 }
 
-                // Clear merged bits from current row
                 let end_bit = bit_pos + right_count;
                 var clear_mask: u32;
                 if end_bit >= 32u {
@@ -223,14 +192,12 @@ fn greedy_merge(
                 }
                 bits = bits & ~clear_mask;
 
-                // Compute quad dimensions
                 let row_start = row - fwd[bit_pos];
-                let length = fwd[bit_pos] + 1u;  // along row axis
-                let width = right_count;           // along bit axis
+                let length = fwd[bit_pos] + 1u;
+                let width = right_count;
 
                 fwd[bit_pos] = 0u;
 
-                // Pack and store quad
                 let coords = face_quad_xyz(face, layer, row_start, bit_pos);
                 let wh = face_quad_wh(face, width, length);
 
@@ -250,11 +217,10 @@ fn greedy_merge(
 
     workgroupBarrier();
 
-    // Reserve global buffer space (single atomic per workgroup)
     if lid.x == 0u {
         let count = min(atomicLoad(&wg_count), 512u);
         if count > 0u {
-            wg_base = atomicAdd(&quad_count, count);
+            wg_base = atomicAdd(&quad_counts[chunk], count);
         } else {
             wg_base = 0u;
         }
@@ -262,14 +228,14 @@ fn greedy_merge(
 
     workgroupBarrier();
 
-    // All 32 threads cooperate to flush quads to global buffer
     let total = min(atomicLoad(&wg_count), 512u);
+    let quad_base = chunk * MAX_QUADS * 2u;
     var qi = lid.x;
     while qi < total {
         let gi = wg_base + qi;
         if gi < MAX_QUADS {
-            quads[gi * 2u] = wg_quads[qi * 2u];
-            quads[gi * 2u + 1u] = wg_quads[qi * 2u + 1u];
+            quads[quad_base + gi * 2u] = wg_quads[qi * 2u];
+            quads[quad_base + gi * 2u + 1u] = wg_quads[qi * 2u + 1u];
         }
         qi = qi + 32u;
     }
