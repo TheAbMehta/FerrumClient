@@ -87,7 +87,7 @@ impl GpuChunkMesher {
 
     /// Create a GPU mesher with pre-allocated buffers for `batch_size` chunks.
     pub fn with_batch_size(batch_size: usize) -> Option<Self> {
-        let batch_size = batch_size.min(MAX_BATCH_SIZE).max(1);
+        let batch_size = batch_size.clamp(1, MAX_BATCH_SIZE);
 
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),

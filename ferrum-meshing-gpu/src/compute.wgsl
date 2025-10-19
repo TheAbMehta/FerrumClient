@@ -105,9 +105,11 @@ fn face_culling(
 }
 
 // ============================================================================
-// Pass 2: 2D Greedy Merge
+// Pass 2: Parallel Greedy Merge (1D right merge, all 32 threads active)
 // ============================================================================
 // Dispatch: (32, 6, N) with workgroup_size(32)
+// Each thread handles one row: right-merges along bit axis, splits on block type.
+// No forward merge (height=1 always) — trades quad count for parallelism.
 
 var<workgroup> wg_quads: array<u32, 1024>;
 var<workgroup> wg_count: atomic<u32>;
@@ -121,6 +123,7 @@ fn greedy_merge(
     let layer = wgid.x;
     let face = wgid.y;
     let chunk = wgid.z;
+    let row = lid.x;
 
     if lid.x == 0u {
         atomicStore(&wg_count, 0u);
@@ -128,95 +131,56 @@ fn greedy_merge(
 
     workgroupBarrier();
 
-    if lid.x == 0u {
-        let mask_base = chunk * FACE_MASK_STRIDE + face * CHUNK_SIZE_SQ + layer * CHUNK_SIZE;
+    let mask_addr = chunk * FACE_MASK_STRIDE + face * CHUNK_SIZE_SQ + layer * CHUNK_SIZE + row;
+    var bits = face_mask_buf[mask_addr];
 
-        var masks: array<u32, 32>;
-        for (var i: u32 = 0u; i < 32u; i = i + 1u) {
-            masks[i] = face_mask_buf[mask_base + i];
+    // Each thread processes its own row: right merge along bit axis
+    while bits != 0u {
+        let bit_pos = countTrailingZeros(bits);
+        let block = get_block_for_face(chunk, face, layer, row, bit_pos);
+
+        // Right merge: extend along bit axis while same block type (cap at 31)
+        var right_count: u32 = 1u;
+        var next_bit = bit_pos + 1u;
+        while next_bit < CHUNK_SIZE && right_count < 31u {
+            if (bits & (1u << next_bit)) == 0u {
+                break;
+            }
+            if block != get_block_for_face(chunk, face, layer, row, next_bit) {
+                break;
+            }
+            right_count = right_count + 1u;
+            next_bit = next_bit + 1u;
         }
 
-        var fwd: array<u32, 32>;
-        for (var i: u32 = 0u; i < 32u; i = i + 1u) {
-            fwd[i] = 0u;
+        // Clear merged bits
+        let end_bit = bit_pos + right_count;
+        var clear_mask: u32;
+        if end_bit >= 32u {
+            clear_mask = ~((1u << bit_pos) - 1u);
+        } else {
+            clear_mask = ((1u << end_bit) - 1u) & ~((1u << bit_pos) - 1u);
         }
+        bits = bits & ~clear_mask;
 
-        for (var row: u32 = 0u; row < CHUNK_SIZE; row = row + 1u) {
-            var bits = masks[row];
-            if bits == 0u {
-                continue;
-            }
+        let coords = face_quad_xyz(face, layer, row, bit_pos);
+        let wh = face_quad_wh(face, right_count, 1u);
 
-            var next_bits: u32 = 0u;
-            if row + 1u < CHUNK_SIZE {
-                next_bits = masks[row + 1u];
-            }
+        let word0 = (coords.x & 0x1Fu) | ((coords.y & 0x1Fu) << 5u)
+                  | ((coords.z & 0x1Fu) << 10u)
+                  | ((wh.x & 0x1Fu) << 15u) | ((wh.y & 0x1Fu) << 20u)
+                  | ((face & 0x7u) << 25u);
 
-            while bits != 0u {
-                let bit_pos = countTrailingZeros(bits);
-                let block = get_block_for_face(chunk, face, layer, row, bit_pos);
-
-                // Forward merge (cap at 30 so length <= 31 for 5-bit packing)
-                if fwd[bit_pos] < 30u
-                    && (next_bits & (1u << bit_pos)) != 0u
-                    && block == get_block_for_face(chunk, face, layer, row + 1u, bit_pos) {
-                    fwd[bit_pos] = fwd[bit_pos] + 1u;
-                    bits = bits & ~(1u << bit_pos);
-                    continue;
-                }
-
-                // Right merge (cap at 31 for 5-bit packing)
-                var right_count: u32 = 1u;
-                var next_bit = bit_pos + 1u;
-                while next_bit < CHUNK_SIZE && right_count < 31u {
-                    if (bits & (1u << next_bit)) == 0u {
-                        break;
-                    }
-                    if fwd[bit_pos] != fwd[next_bit] {
-                        break;
-                    }
-                    if block != get_block_for_face(chunk, face, layer, row, next_bit) {
-                        break;
-                    }
-                    fwd[next_bit] = 0u;
-                    right_count = right_count + 1u;
-                    next_bit = next_bit + 1u;
-                }
-
-                let end_bit = bit_pos + right_count;
-                var clear_mask: u32;
-                if end_bit >= 32u {
-                    clear_mask = ~((1u << bit_pos) - 1u);
-                } else {
-                    clear_mask = ((1u << end_bit) - 1u) & ~((1u << bit_pos) - 1u);
-                }
-                bits = bits & ~clear_mask;
-
-                let row_start = row - fwd[bit_pos];
-                let length = fwd[bit_pos] + 1u;
-                let width = right_count;
-
-                fwd[bit_pos] = 0u;
-
-                let coords = face_quad_xyz(face, layer, row_start, bit_pos);
-                let wh = face_quad_wh(face, width, length);
-
-                let word0 = (coords.x & 0x1Fu) | ((coords.y & 0x1Fu) << 5u)
-                          | ((coords.z & 0x1Fu) << 10u)
-                          | ((wh.x & 0x1Fu) << 15u) | ((wh.y & 0x1Fu) << 20u)
-                          | ((face & 0x7u) << 25u);
-
-                let local_idx = atomicAdd(&wg_count, 1u);
-                if local_idx < 512u {
-                    wg_quads[local_idx * 2u] = word0;
-                    wg_quads[local_idx * 2u + 1u] = block;
-                }
-            }
+        let local_idx = atomicAdd(&wg_count, 1u);
+        if local_idx < 512u {
+            wg_quads[local_idx * 2u] = word0;
+            wg_quads[local_idx * 2u + 1u] = block;
         }
     }
 
     workgroupBarrier();
 
+    // Reserve global buffer space (single atomic per workgroup)
     if lid.x == 0u {
         let count = min(atomicLoad(&wg_count), 512u);
         if count > 0u {
@@ -228,6 +192,7 @@ fn greedy_merge(
 
     workgroupBarrier();
 
+    // All 32 threads flush quads to global buffer
     let total = min(atomicLoad(&wg_count), 512u);
     let quad_base = chunk * MAX_QUADS * 2u;
     var qi = lid.x;
