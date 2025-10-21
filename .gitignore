@@ -23,6 +23,9 @@ Thumbs.db
 # Benchmark results
 /target/criterion
 
+# Pumpkin server (built separately)
+pumpkin-server/
+
 # Asset cache
 .ferrum/
 
