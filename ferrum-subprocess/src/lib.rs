@@ -10,16 +10,16 @@ use tokio::time::timeout;
 pub enum SubprocessError {
     #[error("Failed to spawn process: {0}")]
     SpawnFailed(#[from] std::io::Error),
-    
+
     #[error("Process crashed during startup with exit code: {0:?}")]
     ProcessCrashed(Option<i32>),
-    
+
     #[error("Startup timeout: Done message not received within {0:?}")]
     StartupTimeout(Duration),
-    
+
     #[error("Failed to send stop command: {0}")]
     StopCommandFailed(std::io::Error),
-    
+
     #[error("Process is not running")]
     NotRunning,
 }
@@ -54,10 +54,10 @@ impl PumpkinServer {
         }
 
         let mut child = cmd.spawn()?;
-        
+
         let stdout = child.stdout.take().expect("stdout should be piped");
         let mut reader = BufReader::new(stdout);
-        
+
         let startup_timeout = Duration::from_secs(30);
         let result = timeout(startup_timeout, async {
             let mut line = String::new();
@@ -67,11 +67,14 @@ impl PumpkinServer {
                     Ok(0) => {
                         let exit_status = child.wait().await.ok();
                         return Err(SubprocessError::ProcessCrashed(
-                            exit_status.and_then(|s| s.code())
+                            exit_status.and_then(|s| s.code()),
                         ));
                     }
                     Ok(_) => {
-                        if line.contains("Done") && line.contains("s)!") {
+                        // Support both vanilla ("Done (X.XXXs)!") and Pumpkin ("Started server; took Xms")
+                        if (line.contains("Done") && line.contains("s)!"))
+                            || line.contains("Server is now running")
+                        {
                             break;
                         }
                     }
@@ -79,7 +82,8 @@ impl PumpkinServer {
                 }
             }
             Ok(())
-        }).await;
+        })
+        .await;
 
         match result {
             Ok(Ok(())) => {
@@ -104,16 +108,18 @@ impl PumpkinServer {
 
     pub async fn stop(&mut self) -> Result<(), SubprocessError> {
         let child = self.child.as_mut().ok_or(SubprocessError::NotRunning)?;
-        
+
         if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(b"stop\n").await
+            stdin
+                .write_all(b"stop\n")
+                .await
                 .map_err(SubprocessError::StopCommandFailed)?;
             drop(stdin);
         }
-        
+
         let graceful_timeout = Duration::from_secs(30);
         let result = timeout(graceful_timeout, child.wait()).await;
-        
+
         match result {
             Ok(Ok(_)) => {
                 self.child = None;
