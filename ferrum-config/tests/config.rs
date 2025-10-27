@@ -106,7 +106,7 @@ render_distance = 12
     assert_eq!(config.client.fps_limit, None); // default (unlimited)
     assert_eq!(config.client.vsync, false); // default
 
-    assert_eq!(config.server.address, "localhost:25565"); // default
+    assert_eq!(config.server.address, "127.0.0.1:25565"); // default
     assert_eq!(config.server.auto_start, false); // default
 }
 

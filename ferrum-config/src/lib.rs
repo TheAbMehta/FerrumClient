@@ -110,7 +110,7 @@ fn default_fov() -> f32 {
     70.0
 }
 fn default_server_address() -> String {
-    "localhost:25565".to_string()
+    "127.0.0.1:25565".to_string()
 }
 fn default_asset_source() -> String {
     "mojang".to_string()

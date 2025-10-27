@@ -4,8 +4,8 @@ fov = 70.0
 vsync = false
 
 [server]
-address = "localhost:25565"
-auto_start = false
+address = "127.0.0.1:25565"
+auto_start = true
 
 [assets]
 source = "mojang"
