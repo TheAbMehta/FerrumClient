@@ -6,7 +6,7 @@ pub mod login;
 pub mod player_position;
 
 pub use chunk_loader::{ChunkLoader, ChunkLoaderError};
-pub use connection::{ConnectionError, MinecraftConnection};
+pub use connection::{connect_and_play, ConnectionError, ReceivedChunks};
 pub use entity_sync::EntitySync;
 pub use handshake::perform_handshake;
 pub use login::perform_login;
