@@ -19,6 +19,9 @@ azalea-core = { git = "https://github.com/azalea-rs/azalea" }
 azalea-entity = { git = "https://github.com/azalea-rs/azalea" }
 azalea-protocol = { git = "https://github.com/azalea-rs/azalea" }
 azalea-registry = { git = "https://github.com/azalea-rs/azalea" }
+azalea-world = { git = "https://github.com/azalea-rs/azalea" }
+azalea-block = { git = "https://github.com/azalea-rs/azalea" }
+azalea-buf = { git = "https://github.com/azalea-rs/azalea" }
 glam = "0.30"
 uuid = { version = "1", features = ["v4"] }
 thiserror = "2.0"
