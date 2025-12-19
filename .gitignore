@@ -35,3 +35,8 @@ pumpkin-server/
 # Temporary files
 *.tmp
 *.bak
+
+# Pumpkin server runtime data
+config/
+data/
+world/
