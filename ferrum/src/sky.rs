@@ -1,3 +1,4 @@
+use crate::title_screen::GameState;
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
 
@@ -6,7 +7,7 @@ pub struct SkyPlugin;
 impl Plugin for SkyPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DayNightCycle>()
-            .add_systems(Startup, setup_sky)
+            .add_systems(OnEnter(GameState::InGame), setup_sky)
             .add_systems(
                 Update,
                 (
@@ -15,7 +16,8 @@ impl Plugin for SkyPlugin {
                     update_directional_light,
                     update_ambient_light,
                     update_fog,
-                ),
+                )
+                    .run_if(in_state(GameState::InGame)),
             );
     }
 }

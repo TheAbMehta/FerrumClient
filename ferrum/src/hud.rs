@@ -1,3 +1,4 @@
+use crate::title_screen::GameState;
 use bevy::prelude::*;
 
 pub struct HudPlugin;
@@ -5,10 +6,11 @@ pub struct HudPlugin;
 impl Plugin for HudPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudState>()
-            .add_systems(Startup, setup_hud)
+            .add_systems(OnEnter(GameState::InGame), setup_hud)
             .add_systems(
                 Update,
-                (update_debug_text, update_hotbar_selection, toggle_debug),
+                (update_debug_text, update_hotbar_selection, toggle_debug)
+                    .run_if(in_state(GameState::InGame)),
             );
     }
 }
@@ -61,7 +63,7 @@ struct XpBar;
 struct DebugOverlay;
 
 fn setup_hud(mut commands: Commands) {
-    // Root UI container
+    // Root UI container (Camera3d from main scene handles UI rendering)
     commands
         .spawn(Node {
             width: Val::Percent(100.0),

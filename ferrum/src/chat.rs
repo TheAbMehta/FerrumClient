@@ -1,3 +1,4 @@
+use crate::title_screen::GameState;
 use bevy::input::keyboard::{Key, KeyboardInput};
 use bevy::input::ButtonState;
 use bevy::prelude::*;
@@ -7,7 +8,7 @@ pub struct ChatPlugin;
 impl Plugin for ChatPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ChatState>()
-            .add_systems(Startup, setup_chat)
+            .add_systems(OnEnter(GameState::InGame), setup_chat)
             .add_systems(
                 Update,
                 (
@@ -15,7 +16,8 @@ impl Plugin for ChatPlugin {
                     handle_chat_input,
                     update_chat_messages,
                     fade_old_messages,
-                ),
+                )
+                    .run_if(in_state(GameState::InGame)),
             );
     }
 }

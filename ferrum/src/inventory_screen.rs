@@ -1,3 +1,4 @@
+use crate::title_screen::GameState;
 use bevy::prelude::*;
 
 pub struct InventoryPlugin;
@@ -5,14 +6,15 @@ pub struct InventoryPlugin;
 impl Plugin for InventoryPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<InventoryState>()
-            .add_systems(Startup, setup_inventory_screen)
+            .add_systems(OnEnter(GameState::InGame), setup_inventory_screen)
             .add_systems(
                 Update,
                 (
                     toggle_inventory,
                     handle_slot_interaction,
                     update_inventory_display,
-                ),
+                )
+                    .run_if(in_state(GameState::InGame)),
             );
     }
 }

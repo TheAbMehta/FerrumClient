@@ -1,3 +1,4 @@
+use crate::title_screen::GameState;
 use bevy::prelude::*;
 
 pub struct BlockInteractPlugin;
@@ -11,7 +12,8 @@ impl Plugin for BlockInteractPlugin {
                 handle_block_break,
                 handle_block_place,
                 update_block_highlight,
-            ),
+            )
+                .run_if(in_state(GameState::InGame)),
         );
     }
 }

@@ -1,3 +1,4 @@
+use crate::title_screen::GameState;
 use bevy::app::AppExit;
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, CursorOptions};
@@ -7,7 +8,7 @@ pub struct MenuPlugin;
 impl Plugin for MenuPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<MenuState>()
-            .add_systems(Startup, setup_menu)
+            .add_systems(OnEnter(GameState::InGame), setup_menu)
             .add_systems(
                 Update,
                 (
@@ -16,7 +17,8 @@ impl Plugin for MenuPlugin {
                     handle_settings_buttons,
                     update_button_visuals,
                     update_slider_values,
-                ),
+                )
+                    .run_if(in_state(GameState::InGame)),
             );
     }
 }
@@ -602,7 +604,6 @@ fn toggle_menu(
                 *visibility = Visibility::Inherited;
                 cursor_options.grab_mode = CursorGrabMode::None;
                 cursor_options.visible = true;
-                // Reset to pause menu when opening
                 menu_state.current_screen = MenuScreen::Pause;
             } else {
                 *visibility = Visibility::Hidden;

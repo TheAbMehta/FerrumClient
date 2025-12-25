@@ -2,6 +2,19 @@
 
 A blazingly fast Minecraft client written in Rust, targeting extreme performance (240+ FPS, 64 chunk render distance, <2GB RAM) using Bevy engine and Pumpkin-MC backend.
 
+## Why This Exists
+
+I was frustrated with Minecraft clients. They're heavy, unoptimized, and often crash on machines that should breeze through the game. As someone who spends way too much time optimizing things, I wanted to understand: *how hard is it to build a Minecraft client that doesn't suck?*
+
+In January 2026, I started this project to answer that question. The goal wasn't to compete with the official client, but to explore:
+- How much performance can Rust actually deliver for game development?
+- Can we hit 240 FPS with 64-chunk render distance on 2GB RAM?
+- What's the real bottleneck in modern game rendering? Is it the engine, the renderer, or the data structures?
+
+This is a learning project. Every crate is TDD. Every benchmark is compared against target. The performance targets are arbitrary but meaningful — they force hard engineering choices.
+
+I chose Bevy because it's ECS-first and Rust native. Pumpkin because it's a solid server implementation. Fairy-Stockfish-inspired binary greedy meshing because I wanted to understand the math.
+
 ## Status
 
 **Development Progress**: 31% complete (19/61 tasks)
@@ -12,6 +25,7 @@ A blazingly fast Minecraft client written in Rust, targeting extreme performance
 - Block interaction (break/place)
 - Inventory system with crafting and combat
 - CPU chunk meshing (64µs/chunk, meets Phase 1 target)
+
 - Networking (connection, chunk loading, entity sync)
 - Cross-platform CI (Linux + Windows)
 

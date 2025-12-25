@@ -1,16 +1,21 @@
 mod block_interact;
 mod chat;
+mod entity_renderer;
 mod hud;
 mod inventory_screen;
 mod menu;
 mod network;
+mod player_controller;
 mod sky;
+mod sounds;
+mod texture_loader;
+mod title_screen;
 
 use azalea_block::BlockState;
 use azalea_registry::builtin::BlockKind;
-use bevy::input::mouse::MouseMotion;
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
+use bevy::render::alpha::AlphaMode;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use ferrum_config::{Config, ConfigPlugin};
 use ferrum_meshing_cpu::{ChunkMesher, CpuMesher, CHUNK_SIZE, CHUNK_SIZE_CB, CHUNK_SIZE_SQ};
@@ -21,29 +26,16 @@ use std::process::{Child, Command};
 use std::thread;
 use std::time::Duration;
 
-#[derive(Component)]
-struct FlyCamera {
-    speed: f32,
-    sensitivity: f32,
-    yaw: f32,
-    pitch: f32,
-}
-
-impl Default for FlyCamera {
-    fn default() -> Self {
-        Self {
-            speed: 20.0,
-            sensitivity: 0.002,
-            yaw: 0.0,
-            pitch: 0.0,
-        }
-    }
-}
-
 /// Resource to manage the Pumpkin server process lifecycle
 #[derive(Resource)]
 struct PumpkinServerHandle {
     _child: Option<Child>,
+}
+
+/// Marker resource to track if scene has been set up
+#[derive(Resource)]
+struct SceneSetup {
+    done: bool,
 }
 
 impl Drop for PumpkinServerHandle {
@@ -69,24 +61,39 @@ fn main() {
         .add_plugins(ConfigPlugin {
             config_path: "config.toml".into(),
         })
+        .add_plugins(texture_loader::TextureLoaderPlugin)
+        .add_plugins(title_screen::TitleScreenPlugin)
+        .add_plugins(player_controller::PlayerControllerPlugin)
         .add_plugins(hud::HudPlugin)
         .add_plugins(chat::ChatPlugin)
         .add_plugins(menu::MenuPlugin)
         .add_plugins(sky::SkyPlugin)
         .add_plugins(block_interact::BlockInteractPlugin)
         .add_plugins(inventory_screen::InventoryPlugin)
+        .add_plugins(entity_renderer::EntityRenderPlugin)
+        .add_plugins(sounds::SoundPlugin)
+        .insert_resource(SceneSetup { done: false })
         .add_systems(
-            Startup,
+            OnEnter(title_screen::GameState::InGame),
             (
                 auto_start_pumpkin,
                 connect_to_server,
-                setup_scene,
                 grab_cursor,
             )
                 .chain(),
         )
-        .add_systems(Update, (camera_look, camera_move, toggle_cursor))
+        .add_systems(
+            Update,
+            (
+                setup_scene.run_if(scene_not_setup),
+                toggle_cursor.run_if(in_state(title_screen::GameState::InGame)),
+            ),
+        )
         .run();
+}
+
+fn scene_not_setup(scene_setup: Res<SceneSetup>) -> bool {
+    !scene_setup.done
 }
 
 fn auto_start_pumpkin(mut commands: Commands, config: Res<Config>) {
@@ -138,19 +145,24 @@ fn connect_to_server(mut commands: Commands, config: Res<Config>) {
     tokio::runtime::Runtime::new()
         .expect("Failed to create tokio runtime")
         .block_on(async {
-            match network::connect_and_play(config.server.address.clone()).await {
-                Ok(received_chunks) => {
+            // Add a timeout to prevent hanging
+            let connection_future = network::connect_and_play(config.server.address.clone());
+            match tokio::time::timeout(Duration::from_secs(3), connection_future).await {
+                Ok(Ok(received_chunks)) => {
                     info!(
                         "Successfully connected and received {} chunks!",
                         received_chunks.chunks.len()
                     );
                     commands.insert_resource(received_chunks);
                 }
-                Err(e) => {
+                Ok(Err(e)) => {
                     warn!(
                         "Connection failed: {}. Continuing without server connection.",
                         e
                     );
+                }
+                Err(_) => {
+                    warn!("Connection timed out after 3 seconds. Continuing without server connection.");
                 }
             }
         });
@@ -289,37 +301,49 @@ fn setup_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     received_chunks: Option<Res<ReceivedChunks>>,
+    texture_atlas: Option<Res<texture_loader::BlockTextureAtlas>>,
+    mut scene_setup: ResMut<SceneSetup>,
+    game_state: Res<State<title_screen::GameState>>,
 ) {
+    // Only run in InGame state
+    if *game_state.get() != title_screen::GameState::InGame {
+        return;
+    }
+
+    let Some(texture_atlas) = texture_atlas else {
+        // Texture atlas not loaded yet, will retry next frame
+        return;
+    };
     let initial_yaw = 0.0;
-    let initial_pitch = -std::f32::consts::FRAC_PI_4;
+    let initial_pitch = -std::f32::consts::FRAC_PI_6; // Look down less steeply
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(0.0, 100.0, 0.0).with_rotation(Quat::from_euler(
+        Transform::from_xyz(0.0, 70.0, 0.0).with_rotation(Quat::from_euler(
             EulerRot::YXZ,
             initial_yaw,
             initial_pitch,
             0.0,
         )),
-        FlyCamera {
+        player_controller::PlayerCamera {
             yaw: initial_yaw,
             pitch: initial_pitch,
             ..default()
         },
         DistanceFog {
-            color: Color::srgb(0.47, 0.65, 1.0),
+            color: Color::srgb(0.53, 0.71, 1.0),
             falloff: FogFalloff::Linear {
-                start: 200.0,
-                end: 256.0,
+                start: 300.0,
+                end: 400.0,
             },
             directional_light_color: Color::WHITE,
-            directional_light_exponent: 8.0,
+            directional_light_exponent: 10.0,
         },
     ));
 
     commands.spawn((
         DirectionalLight {
-            illuminance: 10000.0,
-            shadows_enabled: true,
+            illuminance: 150000.0, // Very bright
+            shadows_enabled: false, // Disable shadows for better visibility
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(EulerRot::XYZ, -0.5, 0.5, 0.0)),
@@ -331,6 +355,13 @@ fn setup_scene(
     if let Some(chunks) = received_chunks {
         if !chunks.chunks.is_empty() {
             info!("Rendering {} chunks from server", chunks.chunks.len());
+
+            // Create shared material for all chunks to reduce resource usage
+            let chunk_material = materials.add(StandardMaterial {
+                base_color_texture: Some(texture_atlas.atlas_handle.clone()),
+                alpha_mode: AlphaMode::Blend,
+                ..default()
+            });
 
             for ((chunk_x, chunk_z), chunk_data) in chunks.chunks.iter() {
                 let height = chunk_data.len();
@@ -362,39 +393,48 @@ fn setup_scene(
 
                     commands.spawn((
                         Mesh3d(meshes.add(mesh)),
-                        MeshMaterial3d(materials.add(StandardMaterial {
-                            base_color: Color::WHITE,
-                            ..default()
-                        })),
+                        MeshMaterial3d(chunk_material.clone()),
                         Transform::from_xyz(world_x, world_y, world_z),
                     ));
                 }
             }
 
             info!("Finished rendering server chunks");
+            scene_setup.done = true;
             return;
         }
     }
 
     info!("No server chunks available, generating local terrain");
+
+    // Create shared material for all chunks to reduce resource usage
+    let chunk_material = materials.add(StandardMaterial {
+        base_color_texture: Some(texture_atlas.atlas_handle.clone()),
+        alpha_mode: AlphaMode::Blend,
+        ..default()
+    });
+
     for cx in -2..2 {
         for cz in -2..2 {
             let voxels = ferrum_meshing_gpu::terrain_chunk();
             let chunk_mesh = mesher.mesh_chunk(&voxels);
-            let mut mesh = BlockRenderer::create_mesh(&chunk_mesh, &atlas);
 
+            // Skip empty chunks
+            if chunk_mesh.quads.is_empty() {
+                continue;
+            }
+
+            let mut mesh = BlockRenderer::create_mesh(&chunk_mesh, &atlas);
             add_vertex_colors(&mut mesh, &chunk_mesh);
 
             commands.spawn((
                 Mesh3d(meshes.add(mesh)),
-                MeshMaterial3d(materials.add(StandardMaterial {
-                    base_color: Color::WHITE,
-                    ..default()
-                })),
+                MeshMaterial3d(chunk_material.clone()),
                 Transform::from_xyz(cx as f32 * 32.0, 0.0, cz as f32 * 32.0),
             ));
         }
     }
+    scene_setup.done = true;
 }
 
 fn add_vertex_colors(mesh: &mut Mesh, chunk_mesh: &ferrum_meshing_cpu::ChunkMesh) {
@@ -416,8 +456,12 @@ fn grab_cursor(mut cursor_options: Single<&mut CursorOptions>) {
     cursor_options.visible = false;
 }
 
-fn toggle_cursor(keys: Res<ButtonInput<KeyCode>>, mut cursor_options: Single<&mut CursorOptions>) {
-    if keys.just_pressed(KeyCode::Escape) {
+fn toggle_cursor(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut cursor_options: Single<&mut CursorOptions>,
+    menu_state: Res<menu::MenuState>,
+) {
+    if keys.just_pressed(KeyCode::Escape) && !menu_state.is_open {
         match cursor_options.grab_mode {
             CursorGrabMode::None => {
                 cursor_options.grab_mode = CursorGrabMode::Locked;
@@ -427,58 +471,6 @@ fn toggle_cursor(keys: Res<ButtonInput<KeyCode>>, mut cursor_options: Single<&mu
                 cursor_options.grab_mode = CursorGrabMode::None;
                 cursor_options.visible = true;
             }
-        }
-    }
-}
-
-fn camera_look(
-    mut motion: MessageReader<MouseMotion>,
-    mut query: Query<(&mut Transform, &mut FlyCamera)>,
-) {
-    for ev in motion.read() {
-        for (mut transform, mut cam) in &mut query {
-            cam.yaw -= ev.delta.x * cam.sensitivity;
-            cam.pitch -= ev.delta.y * cam.sensitivity;
-            cam.pitch = cam
-                .pitch
-                .clamp(-89.0_f32.to_radians(), 89.0_f32.to_radians());
-            transform.rotation = Quat::from_euler(EulerRot::YXZ, cam.yaw, cam.pitch, 0.0);
-        }
-    }
-}
-
-fn camera_move(
-    keys: Res<ButtonInput<KeyCode>>,
-    time: Res<Time>,
-    mut query: Query<(&mut Transform, &FlyCamera)>,
-) {
-    for (mut transform, cam) in &mut query {
-        let mut velocity = Vec3::ZERO;
-        let forward = *transform.forward();
-        let right = *transform.right();
-
-        if keys.pressed(KeyCode::KeyW) {
-            velocity += forward;
-        }
-        if keys.pressed(KeyCode::KeyS) {
-            velocity -= forward;
-        }
-        if keys.pressed(KeyCode::KeyD) {
-            velocity += right;
-        }
-        if keys.pressed(KeyCode::KeyA) {
-            velocity -= right;
-        }
-        if keys.pressed(KeyCode::Space) {
-            velocity += Vec3::Y;
-        }
-        if keys.pressed(KeyCode::ShiftLeft) {
-            velocity -= Vec3::Y;
-        }
-
-        if velocity.length_squared() > 0.0 {
-            velocity = velocity.normalize() * cam.speed * time.delta_secs();
-            transform.translation += velocity;
         }
     }
 }

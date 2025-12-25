@@ -237,6 +237,7 @@ pub struct ConfigWatcher {
     pub config_path: PathBuf,
     receiver: Arc<Mutex<mpsc::Receiver<notify::Result<notify::Event>>>>,
     _watcher: Arc<Mutex<RecommendedWatcher>>,
+    last_reload: Arc<Mutex<std::time::Instant>>,
 }
 
 impl ConfigWatcher {
@@ -251,6 +252,7 @@ impl ConfigWatcher {
             config_path: config_path.as_ref().to_path_buf(),
             receiver: Arc::new(Mutex::new(rx)),
             _watcher: Arc::new(Mutex::new(watcher)),
+            last_reload: Arc::new(Mutex::new(std::time::Instant::now())),
         })
     }
 
@@ -265,10 +267,27 @@ impl ConfigWatcher {
 }
 
 pub fn hot_reload_system(mut config: ResMut<Config>, watcher: Res<ConfigWatcher>) {
-    if let Some(_event) = watcher.check_for_changes() {
+    // Check if there are any file change events
+    if watcher.check_for_changes().is_none() {
+        return;  // No changes detected, do nothing
+    }
+
+    // Debounce: only reload once per second even if file changed
+    if let Ok(mut last_reload) = watcher.last_reload.lock() {
+        if last_reload.elapsed().as_secs() < 1 {
+            // Changes detected but too soon since last reload, drain and skip
+            while watcher.check_for_changes().is_some() {}
+            return;
+        }
+
+        // Drain any remaining events to prevent buildup
+        while watcher.check_for_changes().is_some() {}
+
+        // File changed and enough time passed, reload config
         match Config::load(&watcher.config_path) {
             Ok(new_config) => {
                 *config = new_config;
+                *last_reload = std::time::Instant::now();
                 info!("Config reloaded from {:?}", watcher.config_path);
             }
             Err(e) => {
