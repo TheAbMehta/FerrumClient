@@ -1,5 +1,5 @@
+use bevy::ecs::hierarchy::ChildSpawnerCommands;
 use bevy::prelude::*;
-use bevy::hierarchy::ChildBuilder;
 use std::collections::HashMap;
 
 /// Plugin that handles rendering of game entities (players, mobs, items)
@@ -144,7 +144,7 @@ fn spawn_entity(
 
 /// Spawns a player entity mesh (humanoid with colored parts)
 fn spawn_player_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -211,7 +211,7 @@ fn spawn_player_mesh(
 
 /// Spawns a zombie entity mesh (green-tinted humanoid)
 fn spawn_zombie_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -278,7 +278,7 @@ fn spawn_zombie_mesh(
 
 /// Spawns a skeleton entity mesh (thin white humanoid)
 fn spawn_skeleton_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -347,7 +347,7 @@ fn spawn_skeleton_mesh(
 
 /// Spawns a creeper entity mesh (no arms, 4 legs)
 fn spawn_creeper_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -416,7 +416,7 @@ fn spawn_creeper_mesh(
 
 /// Spawns a spider entity mesh (flat body with head)
 fn spawn_spider_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -445,7 +445,7 @@ fn spawn_spider_mesh(
 
 /// Spawns a pig entity mesh (pink quadruped)
 fn spawn_pig_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -514,7 +514,7 @@ fn spawn_pig_mesh(
 
 /// Spawns a cow entity mesh (brown/white quadruped)
 fn spawn_cow_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -583,7 +583,7 @@ fn spawn_cow_mesh(
 
 /// Spawns a sheep entity mesh (white wool quadruped)
 fn spawn_sheep_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -653,7 +653,7 @@ fn spawn_sheep_mesh(
 
 /// Spawns a chicken entity mesh (small white bird)
 fn spawn_chicken_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -703,7 +703,7 @@ fn spawn_chicken_mesh(
 
 /// Spawns a dropped item entity mesh (small spinning box)
 fn spawn_dropped_item_mesh(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
@@ -719,7 +719,7 @@ fn spawn_dropped_item_mesh(
 
 /// Spawns a health bar above an entity
 fn spawn_health_bar(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     entity_id: i32,
