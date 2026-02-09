@@ -27,6 +27,7 @@ uuid = { version = "1", features = ["v4"] }
 thiserror = "2.0"
 reqwest = { version = "0.11", features = ["blocking"] }
 image = "0.24"
+chrono = "0.4"
 
 # Pumpkin server integration (commented out until workspace issues resolved)
 # pumpkin-world = { path = "../pumpkin-server/pumpkin-world" }

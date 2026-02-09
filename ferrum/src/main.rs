@@ -6,6 +6,7 @@ mod inventory_screen;
 mod menu;
 mod network;
 mod player_controller;
+mod screenshot;
 mod sky;
 // mod sounds;  // TODO: Needs Bevy 0.18 API migration
 mod texture_loader;
@@ -76,6 +77,8 @@ fn main() {
         .add_plugins(network::PersistentConnectionPlugin)
         .add_plugins(network::EntitySyncPlugin)
         .add_plugins(network::PlayerPositionPlugin)
+        // Utility plugins
+        .add_plugins(screenshot::ScreenshotPlugin)
         .insert_resource(SceneSetup { done: false })
         .add_systems(
             OnEnter(title_screen::GameState::InGame),
