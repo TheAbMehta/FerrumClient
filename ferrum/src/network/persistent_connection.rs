@@ -80,6 +80,7 @@ pub struct PersistentConnectionPlugin;
 
 impl Plugin for PersistentConnectionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, handle_incoming_packets);
+        app.init_resource::<ReceivedChunks>()
+            .add_systems(Update, handle_incoming_packets);
     }
 }
