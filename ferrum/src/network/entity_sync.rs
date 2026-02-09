@@ -1,10 +1,13 @@
 use azalea_core::entity_id::MinecraftEntityId;
 use azalea_core::position::Vec3;
+use azalea_protocol::packets::game::ClientboundGamePacket;
 use azalea_registry::builtin::EntityKind;
+use bevy::prelude::*;
 use ferrum_entity::Entity;
 use std::collections::HashMap;
 use uuid::Uuid;
 
+#[derive(Resource)]
 pub struct EntitySync {
     entities: HashMap<MinecraftEntityId, Entity>,
 }
@@ -96,6 +99,25 @@ impl EntitySync {
 impl Default for EntitySync {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Bevy system that processes entity-related packets from the server
+pub fn handle_entity_packets(
+    mut entity_sync: ResMut<EntitySync>,
+    // TODO: Get packets from ServerConnection
+) {
+    // TODO: Process entity spawn/despawn/update packets
+    // This will be connected to the persistent connection packet stream
+}
+
+/// Plugin for entity synchronization
+pub struct EntitySyncPlugin;
+
+impl Plugin for EntitySyncPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<EntitySync>()
+            .add_systems(Update, handle_entity_packets);
     }
 }
 
