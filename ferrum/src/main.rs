@@ -9,6 +9,7 @@ mod particles;
 mod player_controller;
 mod screenshot;
 mod sky;
+mod weather;
 // mod sounds;  // TODO: Needs Bevy 0.18 API migration
 mod texture_loader;
 mod title_screen;
@@ -81,6 +82,7 @@ fn main() {
         // Utility plugins
         .add_plugins(screenshot::ScreenshotPlugin)
         .add_plugins(particles::ParticlePlugin)
+        .add_plugins(weather::WeatherPlugin)
         .insert_resource(SceneSetup { done: false })
         .add_systems(
             OnEnter(title_screen::GameState::InGame),
