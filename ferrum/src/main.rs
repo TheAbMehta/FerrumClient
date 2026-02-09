@@ -1,5 +1,6 @@
 mod block_interact;
 mod chat;
+mod death_screen;
 mod entity_renderer;
 mod hud;
 mod inventory_screen;
@@ -66,6 +67,7 @@ fn main() {
         })
         .add_plugins(texture_loader::TextureLoaderPlugin)
         .add_plugins(title_screen::TitleScreenPlugin)
+        .add_plugins(death_screen::DeathScreenPlugin)
         .add_plugins(player_controller::PlayerControllerPlugin)
         .add_plugins(hud::HudPlugin)
         .add_plugins(chat::ChatPlugin)

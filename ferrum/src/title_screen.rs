@@ -27,6 +27,7 @@ pub enum GameState {
     TitleScreen,
     Loading,
     InGame,
+    Dead,
 }
 
 #[derive(Component)]
