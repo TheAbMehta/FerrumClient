@@ -5,6 +5,7 @@ mod hud;
 mod inventory_screen;
 mod menu;
 mod network;
+mod particles;
 mod player_controller;
 mod screenshot;
 mod sky;
@@ -79,6 +80,7 @@ fn main() {
         .add_plugins(network::PlayerPositionPlugin)
         // Utility plugins
         .add_plugins(screenshot::ScreenshotPlugin)
+        .add_plugins(particles::ParticlePlugin)
         .insert_resource(SceneSetup { done: false })
         .add_systems(
             OnEnter(title_screen::GameState::InGame),

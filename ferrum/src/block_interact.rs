@@ -1,3 +1,4 @@
+use crate::particles;
 use crate::title_screen::GameState;
 use bevy::prelude::*;
 
@@ -110,6 +111,9 @@ fn handle_block_break(
     mouse_input: Res<ButtonInput<MouseButton>>,
     time: Res<Time>,
     mut block_target: ResMut<BlockTarget>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     if mouse_input.pressed(MouseButton::Left) {
         if let Some(block_pos) = block_target.targeted_block {
@@ -120,6 +124,26 @@ fn handle_block_break(
 
             if block_target.break_progress >= 1.0 {
                 info!("Broke block at {:?}", block_pos);
+
+                // Spawn particle effects
+                let break_position = Vec3::new(
+                    block_pos.x as f32 + 0.5,
+                    block_pos.y as f32 + 0.5,
+                    block_pos.z as f32 + 0.5,
+                );
+
+                // Use stone/dirt color for now
+                let block_color = Color::srgb(0.5, 0.4, 0.3);
+
+                particles::spawn_block_break_particles(
+                    &mut commands,
+                    &mut meshes,
+                    &mut materials,
+                    break_position,
+                    block_color,
+                    8, // particle count
+                );
+
                 // TODO: Send block break packet to server
                 // TODO: Update local world state
 
