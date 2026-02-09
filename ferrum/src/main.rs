@@ -9,6 +9,7 @@ mod network;
 mod particles;
 mod player_controller;
 mod screenshot;
+mod settings_screen;
 mod sky;
 mod sounds;
 mod weather;
@@ -68,6 +69,7 @@ fn main() {
         .add_plugins(texture_loader::TextureLoaderPlugin)
         .add_plugins(title_screen::TitleScreenPlugin)
         .add_plugins(death_screen::DeathScreenPlugin)
+        .add_plugins(settings_screen::SettingsScreenPlugin)
         .add_plugins(player_controller::PlayerControllerPlugin)
         .add_plugins(hud::HudPlugin)
         .add_plugins(chat::ChatPlugin)
