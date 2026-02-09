@@ -30,10 +30,10 @@ image = "0.24"
 chrono = "0.4"
 rand = "0.8"
 
-# Pumpkin server integration (commented out until workspace issues resolved)
+# Pumpkin server integration (workspace dependency conflicts - needs separate workspace)
+# TODO: Use git dependencies or publish to crates.io
 # pumpkin-world = { path = "../pumpkin-server/pumpkin-world" }
 # pumpkin-inventory = { path = "../pumpkin-server/pumpkin-inventory" }
 # pumpkin-data = { path = "../pumpkin-server/pumpkin-data" }
 # pumpkin-protocol = { path = "../pumpkin-server/pumpkin-protocol" }
 # pumpkin-util = { path = "../pumpkin-server/pumpkin-util" }
-# pumpkin-nbt = { path = "../pumpkin-server/pumpkin-nbt" }

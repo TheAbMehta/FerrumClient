@@ -1,6 +1,6 @@
 mod block_interact;
 mod chat;
-// mod entity_renderer;  // TODO: Needs Bevy 0.18 API migration
+mod entity_renderer;
 mod hud;
 mod inventory_screen;
 mod menu;
@@ -9,8 +9,8 @@ mod particles;
 mod player_controller;
 mod screenshot;
 mod sky;
+mod sounds;
 mod weather;
-// mod sounds;  // TODO: Needs Bevy 0.18 API migration
 mod texture_loader;
 mod title_screen;
 
@@ -73,8 +73,8 @@ fn main() {
         .add_plugins(sky::SkyPlugin)
         .add_plugins(block_interact::BlockInteractPlugin)
         .add_plugins(inventory_screen::InventoryPlugin)
-        // .add_plugins(entity_renderer::EntityRenderPlugin)  // TODO: Needs Bevy 0.18 migration
-        // .add_plugins(sounds::SoundPlugin)  // TODO: Needs Bevy 0.18 migration
+        .add_plugins(entity_renderer::EntityRenderPlugin)
+        .add_plugins(sounds::SoundPlugin)
         // Network/Multiplayer plugins
         .add_plugins(network::PersistentConnectionPlugin)
         .add_plugins(network::EntitySyncPlugin)
