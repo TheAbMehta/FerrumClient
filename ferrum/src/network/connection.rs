@@ -370,3 +370,240 @@ pub async fn connect_and_play(address: String) -> Result<ReceivedChunks, Connect
     );
     Ok(received_chunks)
 }
+
+/// Connect to server and return a persistent connection along with initial chunks
+/// This function goes through the full handshake/login/config flow, waits for initial
+/// chunks, then returns the active connection for continuous use.
+pub async fn connect_persistent(
+    address: String,
+) -> Result<
+    (
+        Box<dyn std::any::Any + Send>,
+        ReceivedChunks,
+        i32,
+    ),
+    ConnectionError,
+> {
+    info!("Starting persistent connection to {}", address);
+
+    // Resolve address
+    let socket_addr = address
+        .to_socket_addrs()
+        .map_err(|e| ConnectionError::ConnectionFailed(e))?
+        .next()
+        .ok_or_else(|| ConnectionError::HandshakeFailed("Failed to resolve address".to_string()))?;
+
+    // Phase 1: Handshake
+    info!("Phase 1: Handshake");
+    let mut conn =
+        Connection::<ClientboundHandshakePacket, ServerboundHandshakePacket>::new(&socket_addr)
+            .await?;
+
+    conn.write(ServerboundIntention {
+        protocol_version: PROTOCOL_VERSION,
+        hostname: socket_addr.ip().to_string(),
+        port: socket_addr.port(),
+        intention: ClientIntention::Login,
+    })
+    .await
+    .map_err(|_| ConnectionError::PacketWriteFailed)?;
+
+    // Phase 2: Login
+    info!("Phase 2: Login");
+    let mut conn = conn.login();
+
+    conn.write(ServerboundHello {
+        name: "FerrumBot".to_string(),
+        profile_id: Uuid::nil(),
+    })
+    .await
+    .map_err(|_| ConnectionError::PacketWriteFailed)?;
+
+    // Handle login packets
+    loop {
+        match conn.read().await {
+            Ok(packet) => match packet {
+                ClientboundLoginPacket::LoginCompression(compression) => {
+                    info!(
+                        "Setting compression threshold: {}",
+                        compression.compression_threshold
+                    );
+                    conn.set_compression_threshold(compression.compression_threshold);
+                }
+                ClientboundLoginPacket::CookieRequest(cookie_req) => {
+                    info!("Received cookie request: {:?}", cookie_req.key);
+                    conn.write(LoginServerboundCookieResponse {
+                        key: cookie_req.key.clone(),
+                        payload: None,
+                    })
+                    .await
+                    .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                ClientboundLoginPacket::LoginFinished(profile) => {
+                    info!(
+                        "Login finished for profile: {:?}",
+                        profile.game_profile.name
+                    );
+                    break;
+                }
+                ClientboundLoginPacket::LoginDisconnect(disconnect) => {
+                    return Err(ConnectionError::LoginFailed(format!(
+                        "Server disconnected: {:?}",
+                        disconnect.reason
+                    )));
+                }
+                _ => {
+                    debug!("Unhandled login packet: {:?}", packet);
+                }
+            },
+            Err(_) => {
+                return Err(ConnectionError::PacketReadFailed);
+            }
+        }
+    }
+
+    // Phase 3: Config
+    info!("Phase 3: Config");
+    let mut conn = conn.config();
+
+    loop {
+        match conn.read().await {
+            Ok(packet) => match packet {
+                ClientboundConfigPacket::SelectKnownPacks(packs) => {
+                    info!(
+                        "Received SelectKnownPacks with {} packs",
+                        packs.known_packs.len()
+                    );
+                    conn.write(ServerboundSelectKnownPacks {
+                        known_packs: vec![],
+                    })
+                    .await
+                    .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                ClientboundConfigPacket::RegistryData(registry) => {
+                    info!("Received RegistryData: {:?}", registry.registry_id);
+                }
+                ClientboundConfigPacket::KeepAlive(keep_alive) => {
+                    debug!("Config KeepAlive: {}", keep_alive.id);
+                    conn.write(ConfigServerboundKeepAlive { id: keep_alive.id })
+                        .await
+                        .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                ClientboundConfigPacket::Ping(ping) => {
+                    debug!("Config Ping: {}", ping.id);
+                    conn.write(ConfigServerboundPong { id: ping.id })
+                        .await
+                        .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                ClientboundConfigPacket::FinishConfiguration(_) => {
+                    info!("Received FinishConfiguration, transitioning to game");
+                    conn.write(ServerboundFinishConfiguration {})
+                        .await
+                        .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                    break;
+                }
+                ClientboundConfigPacket::CookieRequest(cookie_req) => {
+                    info!("Config cookie request: {:?}", cookie_req.key);
+                    conn.write(ConfigServerboundCookieResponse {
+                        key: cookie_req.key.clone(),
+                        payload: None,
+                    })
+                    .await
+                    .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                _ => {
+                    debug!(
+                        "Unhandled config packet: {:?}",
+                        std::any::type_name_of_val(&packet)
+                    );
+                }
+            },
+            Err(_) => {
+                return Err(ConnectionError::PacketReadFailed);
+            }
+        }
+    }
+
+    // Phase 4: Game - Collect initial chunks but keep connection alive
+    info!("Phase 4: Game");
+    let mut conn = conn.game();
+    let mut received_chunks = ReceivedChunks::new();
+    let start_time = Instant::now();
+    let initial_collection_duration = Duration::from_secs(3);
+    let mut player_id = 0i32;
+
+    // Collect initial chunks
+    loop {
+        if start_time.elapsed() > initial_collection_duration {
+            info!(
+                "Initial chunk collection complete ({} chunks), keeping connection alive",
+                received_chunks.chunks.len()
+            );
+            break;
+        }
+
+        match conn.read().await {
+            Ok(packet) => match packet {
+                ClientboundGamePacket::Login(login) => {
+                    player_id = login.player_id.0;
+                    info!(
+                        "Game Login: entity_id={}, chunk_radius={}",
+                        login.player_id, login.chunk_radius
+                    );
+                    conn.write(ServerboundPlayerLoaded {})
+                        .await
+                        .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                ClientboundGamePacket::PlayerPosition(pos) => {
+                    info!("PlayerPosition: teleport_id={}", pos.id);
+                    conn.write(ServerboundAcceptTeleportation { id: pos.id })
+                        .await
+                        .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                ClientboundGamePacket::KeepAlive(keep_alive) => {
+                    debug!("Game KeepAlive: {}", keep_alive.id);
+                    conn.write(GameServerboundKeepAlive { id: keep_alive.id })
+                        .await
+                        .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                ClientboundGamePacket::LevelChunkWithLight(chunk_packet) => {
+                    info!("Received chunk at ({}, {})", chunk_packet.x, chunk_packet.z);
+                    if let Err(e) = received_chunks.add_chunk(
+                        chunk_packet.x,
+                        chunk_packet.z,
+                        &chunk_packet.chunk_data,
+                    ) {
+                        warn!("Failed to parse chunk: {}", e);
+                    }
+                }
+                ClientboundGamePacket::ChunkBatchFinished(batch) => {
+                    info!("ChunkBatchFinished: batch_size={}", batch.batch_size);
+                    conn.write(ServerboundChunkBatchReceived {
+                        desired_chunks_per_tick: 5.0,
+                    })
+                    .await
+                    .map_err(|_| ConnectionError::PacketWriteFailed)?;
+                }
+                _ => {
+                    trace!(
+                        "Unhandled game packet: {:?}",
+                        std::any::type_name_of_val(&packet)
+                    );
+                }
+            },
+            Err(e) => {
+                warn!("Error reading game packet: {:?}", e);
+                if start_time.elapsed() > Duration::from_secs(1) {
+                    break;
+                }
+                return Err(ConnectionError::PacketReadFailed);
+            }
+        }
+    }
+
+    info!(
+        "Returning persistent connection with {} initial chunks",
+        received_chunks.chunks.len()
+    );
+    Ok((Box::new(conn), received_chunks, player_id))
+}
