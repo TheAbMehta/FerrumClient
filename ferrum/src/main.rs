@@ -1,13 +1,13 @@
 mod block_interact;
 mod chat;
-mod entity_renderer;
+// mod entity_renderer;  // TODO: Needs Bevy 0.18 API migration
 mod hud;
 mod inventory_screen;
 mod menu;
 mod network;
 mod player_controller;
 mod sky;
-mod sounds;
+// mod sounds;  // TODO: Needs Bevy 0.18 API migration
 mod texture_loader;
 mod title_screen;
 
@@ -70,8 +70,8 @@ fn main() {
         .add_plugins(sky::SkyPlugin)
         .add_plugins(block_interact::BlockInteractPlugin)
         .add_plugins(inventory_screen::InventoryPlugin)
-        .add_plugins(entity_renderer::EntityRenderPlugin)
-        .add_plugins(sounds::SoundPlugin)
+        // .add_plugins(entity_renderer::EntityRenderPlugin)  // TODO: Needs Bevy 0.18 migration
+        // .add_plugins(sounds::SoundPlugin)  // TODO: Needs Bevy 0.18 migration
         .insert_resource(SceneSetup { done: false })
         .add_systems(
             OnEnter(title_screen::GameState::InGame),
