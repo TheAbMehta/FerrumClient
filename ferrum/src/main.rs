@@ -72,6 +72,10 @@ fn main() {
         .add_plugins(inventory_screen::InventoryPlugin)
         // .add_plugins(entity_renderer::EntityRenderPlugin)  // TODO: Needs Bevy 0.18 migration
         // .add_plugins(sounds::SoundPlugin)  // TODO: Needs Bevy 0.18 migration
+        // Network/Multiplayer plugins
+        .add_plugins(network::PersistentConnectionPlugin)
+        .add_plugins(network::EntitySyncPlugin)
+        .add_plugins(network::PlayerPositionPlugin)
         .insert_resource(SceneSetup { done: false })
         .add_systems(
             OnEnter(title_screen::GameState::InGame),
