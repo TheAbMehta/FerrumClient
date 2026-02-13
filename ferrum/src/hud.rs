@@ -45,6 +45,9 @@ impl Default for HudState {
 }
 
 #[derive(Component)]
+struct HudCamera;
+
+#[derive(Component)]
 struct Crosshair;
 
 #[derive(Component)]
@@ -63,7 +66,15 @@ struct XpBar;
 struct DebugOverlay;
 
 fn setup_hud(mut commands: Commands) {
-    // Root UI container (Camera3d from main scene handles UI rendering)
+    commands.spawn((
+        Camera2d,
+        HudCamera,
+        Camera {
+            order: 1,
+            ..default()
+        },
+    ));
+
     commands
         .spawn(Node {
             width: Val::Percent(100.0),

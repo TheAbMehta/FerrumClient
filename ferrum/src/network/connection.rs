@@ -355,7 +355,8 @@ pub async fn connect_and_play(address: String) -> Result<ReceivedChunks, Connect
             },
             Err(e) => {
                 warn!("Error reading game packet: {:?}", e);
-                // Don't immediately fail, server might have closed connection after sending chunks
+                // Don't immediately fail, server might have closed connection after sending
+                // chunks
                 if start_time.elapsed() > Duration::from_secs(1) {
                     break;
                 }
@@ -371,19 +372,13 @@ pub async fn connect_and_play(address: String) -> Result<ReceivedChunks, Connect
     Ok(received_chunks)
 }
 
-/// Connect to server and return a persistent connection along with initial chunks
-/// This function goes through the full handshake/login/config flow, waits for initial
-/// chunks, then returns the active connection for continuous use.
+/// Connect to server and return a persistent connection along with initial
+/// chunks This function goes through the full handshake/login/config flow,
+/// waits for initial chunks, then returns the active connection for continuous
+/// use.
 pub async fn connect_persistent(
     address: String,
-) -> Result<
-    (
-        Box<dyn std::any::Any + Send>,
-        ReceivedChunks,
-        i32,
-    ),
-    ConnectionError,
-> {
+) -> Result<(Box<dyn std::any::Any + Send>, ReceivedChunks, i32), ConnectionError> {
     info!("Starting persistent connection to {}", address);
 
     // Resolve address

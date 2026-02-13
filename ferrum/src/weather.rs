@@ -6,8 +6,14 @@ pub struct WeatherPlugin;
 
 impl Plugin for WeatherPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<WeatherState>()
-            .add_systems(Update, (update_rain_particles, update_snow_particles, cleanup_weather_particles));
+        app.init_resource::<WeatherState>().add_systems(
+            Update,
+            (
+                update_rain_particles,
+                update_snow_particles,
+                cleanup_weather_particles,
+            ),
+        );
     }
 }
 
@@ -182,10 +188,7 @@ fn update_snow_particles(
 }
 
 /// System that removes old weather particles
-fn cleanup_weather_particles(
-    mut commands: Commands,
-    particles: Query<(Entity, &WeatherParticle)>,
-) {
+fn cleanup_weather_particles(mut commands: Commands, particles: Query<(Entity, &WeatherParticle)>) {
     for (entity, particle) in &particles {
         if particle.age > particle.max_age {
             commands.entity(entity).despawn();

@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::title_screen::GameState;
+use bevy::prelude::*;
 
 pub struct DeathScreenPlugin;
 

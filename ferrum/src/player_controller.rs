@@ -1,3 +1,4 @@
+use crate::title_screen::GameState;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use ferrum_physics::collision::Aabb;
@@ -5,7 +6,7 @@ use ferrum_physics::movement::MovementInput;
 use ferrum_physics::Player;
 
 const EYE_HEIGHT: f32 = 1.62;
-const GROUND_LEVEL: f32 = 64.0; // TODO: Replace with proper chunk-based collision detection
+const GROUND_LEVEL: f32 = 17.0; // TODO: Replace with proper chunk-based collision detection
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
@@ -24,7 +25,7 @@ pub struct PlayerState {
 impl Default for PlayerState {
     fn default() -> Self {
         Self {
-            player: Player::new(Vec3::new(0.0, 100.0, 0.0)),
+            player: Player::new(Vec3::new(0.0, 20.0, 0.0)),
             game_mode: GameMode::Survival,
             is_flying: false,
             fly_speed: 20.0,
@@ -64,7 +65,8 @@ impl Plugin for PlayerControllerPlugin {
                 player_collision,
                 update_camera_position,
             )
-                .chain(),
+                .chain()
+                .run_if(in_state(GameState::InGame)),
         );
     }
 }
@@ -163,8 +165,8 @@ fn player_movement(
 
             if state.player.on_ground() {
                 let target_velocity = movement_direction * speed;
-                let acceleration = 0.098;
-                let friction = 0.546;
+                let acceleration = 0.6;
+                let friction = 0.91;
 
                 let mut new_velocity = current_velocity;
                 new_velocity.x += (target_velocity.x - current_velocity.x) * acceleration;

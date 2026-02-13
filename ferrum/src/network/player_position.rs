@@ -116,10 +116,7 @@ pub fn send_player_position_updates(
 
     // TODO: Actually send the packet via ServerConnection
     // For now, just log and update tracker
-    debug!(
-        "Would send position update: {:?}",
-        current_position
-    );
+    debug!("Would send position update: {:?}", current_position);
 
     // Assume player is on ground for now (TODO: proper ground detection)
     let on_ground = true;

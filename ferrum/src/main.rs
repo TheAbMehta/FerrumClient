@@ -12,15 +12,17 @@ mod screenshot;
 mod settings_screen;
 mod sky;
 mod sounds;
-mod weather;
 mod texture_loader;
 mod title_screen;
+mod weather;
 
 use azalea_block::BlockState;
 use azalea_registry::builtin::BlockKind;
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
 use bevy::render::alpha::AlphaMode;
+use bevy::render::settings::{Backends, WgpuSettings};
+use bevy::render::RenderPlugin;
 use bevy::window::{CursorGrabMode, CursorOptions};
 use ferrum_config::{Config, ConfigPlugin};
 use ferrum_meshing_cpu::{ChunkMesher, CpuMesher, CHUNK_SIZE, CHUNK_SIZE_CB, CHUNK_SIZE_SQ};
@@ -28,6 +30,7 @@ use ferrum_render::{BlockRenderer, TextureAtlas};
 use network::ReceivedChunks;
 use std::path::PathBuf;
 use std::process::{Child, Command};
+use std::sync::{mpsc, Mutex};
 use std::thread;
 use std::time::Duration;
 
@@ -43,6 +46,28 @@ struct SceneSetup {
     done: bool,
 }
 
+/// Tracks the async connection lifecycle
+#[derive(Resource)]
+struct ConnectionState {
+    phase: ConnectionPhase,
+    receiver: Option<Mutex<mpsc::Receiver<Option<ReceivedChunks>>>>,
+}
+
+enum ConnectionPhase {
+    NotStarted,
+    Connecting,
+    Done,
+}
+
+impl Default for ConnectionState {
+    fn default() -> Self {
+        Self {
+            phase: ConnectionPhase::NotStarted,
+            receiver: None,
+        }
+    }
+}
+
 impl Drop for PumpkinServerHandle {
     fn drop(&mut self) {
         if let Some(mut child) = self._child.take() {
@@ -55,14 +80,25 @@ impl Drop for PumpkinServerHandle {
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: "Ferrum Client".to_string(),
-                resolution: (1920, 1080).into(),
-                ..default()
-            }),
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Ferrum Client".to_string(),
+                        resolution: (1920, 1080).into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(RenderPlugin {
+                    render_creation: WgpuSettings {
+                        backends: Some(Backends::VULKAN),
+                        ..default()
+                    }
+                    .into(),
+                    ..default()
+                }),
+        )
         .add_plugins(ConfigPlugin {
             config_path: "config.toml".into(),
         })
@@ -88,21 +124,18 @@ fn main() {
         .add_plugins(particles::ParticlePlugin)
         .add_plugins(weather::WeatherPlugin)
         .insert_resource(SceneSetup { done: false })
+        .init_resource::<ConnectionState>()
+        .add_systems(OnEnter(title_screen::GameState::InGame), grab_cursor)
         .add_systems(
-            OnEnter(title_screen::GameState::InGame),
-            (
-                auto_start_pumpkin,
-                connect_to_server,
-                grab_cursor,
-            )
-                .chain(),
+            Update,
+            setup_scene
+                .run_if(scene_not_setup)
+                .run_if(in_state(title_screen::GameState::InGame)),
         )
         .add_systems(
             Update,
-            (
-                setup_scene.run_if(scene_not_setup),
-                toggle_cursor.run_if(in_state(title_screen::GameState::InGame)),
-            ),
+            (async_connection_system, toggle_cursor)
+                .run_if(in_state(title_screen::GameState::InGame)),
         )
         .run();
 }
@@ -111,76 +144,103 @@ fn scene_not_setup(scene_setup: Res<SceneSetup>) -> bool {
     !scene_setup.done
 }
 
-fn auto_start_pumpkin(mut commands: Commands, config: Res<Config>) {
-    if config.server.auto_start {
-        info!("Auto-starting Pumpkin server...");
-
-        let pumpkin_path = PathBuf::from("./pumpkin-server/target/release/pumpkin");
-
-        if !pumpkin_path.exists() {
-            warn!(
-                "Pumpkin server binary not found at {:?}. Continuing without local server.",
-                pumpkin_path
-            );
-            commands.insert_resource(PumpkinServerHandle { _child: None });
-            return;
-        }
-
-        match Command::new(&pumpkin_path)
-            .current_dir("./pumpkin-server")
-            .spawn()
-        {
-            Ok(child) => {
-                info!("Pumpkin server process started, waiting 3 seconds for startup...");
-                thread::sleep(Duration::from_secs(3));
-                commands.insert_resource(PumpkinServerHandle {
-                    _child: Some(child),
-                });
-                info!("Pumpkin server should be ready");
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to start Pumpkin server: {}. Continuing without local server.",
-                    e
-                );
+fn async_connection_system(
+    mut commands: Commands,
+    config: Res<Config>,
+    mut conn_state: ResMut<ConnectionState>,
+) {
+    match conn_state.phase {
+        ConnectionPhase::NotStarted => {
+            // Start pumpkin server (non-blocking)
+            if config.server.auto_start {
+                let pumpkin_path = PathBuf::from("./pumpkin-server/target/release/pumpkin");
+                if pumpkin_path.exists() {
+                    match Command::new(&pumpkin_path)
+                        .current_dir("./pumpkin-server")
+                        .spawn()
+                    {
+                        Ok(child) => {
+                            info!("Pumpkin server process started (non-blocking)");
+                            commands.insert_resource(PumpkinServerHandle {
+                                _child: Some(child),
+                            });
+                        }
+                        Err(e) => {
+                            warn!("Failed to start Pumpkin server: {}", e);
+                            commands.insert_resource(PumpkinServerHandle { _child: None });
+                        }
+                    }
+                } else {
+                    warn!("Pumpkin server binary not found at {:?}", pumpkin_path);
+                    commands.insert_resource(PumpkinServerHandle { _child: None });
+                }
+            } else {
                 commands.insert_resource(PumpkinServerHandle { _child: None });
             }
+
+            // Spawn background connection thread
+            let (tx, rx) = mpsc::channel();
+            let address = config.server.address.clone();
+            thread::spawn(move || {
+                let result = tokio::runtime::Runtime::new()
+                    .expect("Failed to create tokio runtime")
+                    .block_on(async {
+                        let connection_future = network::connect_and_play(address.clone());
+                        match tokio::time::timeout(Duration::from_secs(5), connection_future).await
+                        {
+                            Ok(Ok(received_chunks)) => Some(received_chunks),
+                            Ok(Err(e)) => {
+                                eprintln!("Connection failed: {}", e);
+                                None
+                            }
+                            Err(_) => {
+                                eprintln!("Connection timed out after 5 seconds");
+                                None
+                            }
+                        }
+                    });
+                let _ = tx.send(result);
+            });
+
+            conn_state.receiver = Some(Mutex::new(rx));
+            conn_state.phase = ConnectionPhase::Connecting;
+            info!("Connection started in background thread");
         }
-    } else {
-        commands.insert_resource(PumpkinServerHandle { _child: None });
-    }
-}
+        ConnectionPhase::Connecting => {
+            let result = conn_state.receiver.as_ref().and_then(|rx_mutex| {
+                let rx = rx_mutex.lock().unwrap();
+                match rx.try_recv() {
+                    Ok(v) => Some(Ok(v)),
+                    Err(mpsc::TryRecvError::Empty) => None,
+                    Err(e) => Some(Err(e)),
+                }
+            });
 
-fn connect_to_server(mut commands: Commands, config: Res<Config>) {
-    info!(
-        "Connecting to Minecraft server at {}...",
-        config.server.address
-    );
-
-    tokio::runtime::Runtime::new()
-        .expect("Failed to create tokio runtime")
-        .block_on(async {
-            // Add a timeout to prevent hanging
-            let connection_future = network::connect_and_play(config.server.address.clone());
-            match tokio::time::timeout(Duration::from_secs(3), connection_future).await {
-                Ok(Ok(received_chunks)) => {
+            match result {
+                Some(Ok(Some(received_chunks))) => {
                     info!(
-                        "Successfully connected and received {} chunks!",
+                        "Background connection succeeded: {} chunks received",
                         received_chunks.chunks.len()
                     );
                     commands.insert_resource(received_chunks);
+                    conn_state.phase = ConnectionPhase::Done;
+                    conn_state.receiver = None;
                 }
-                Ok(Err(e)) => {
-                    warn!(
-                        "Connection failed: {}. Continuing without server connection.",
-                        e
-                    );
+                Some(Ok(None)) => {
+                    warn!("Background connection completed without chunks");
+                    conn_state.phase = ConnectionPhase::Done;
+                    conn_state.receiver = None;
                 }
-                Err(_) => {
-                    warn!("Connection timed out after 3 seconds. Continuing without server connection.");
+                Some(Err(_)) => {
+                    warn!("Connection thread disconnected unexpectedly");
+                    conn_state.phase = ConnectionPhase::Done;
+                    conn_state.receiver = None;
                 }
+                None => {}
             }
-        });
+        }
+        ConnectionPhase::Done => {}
+    }
 }
 
 fn mc_block_state_to_type(state_id: u16) -> u32 {
@@ -333,7 +393,7 @@ fn setup_scene(
     let initial_pitch = -std::f32::consts::FRAC_PI_6; // Look down less steeply
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(0.0, 70.0, 0.0).with_rotation(Quat::from_euler(
+        Transform::from_xyz(0.0, 20.0, 0.0).with_rotation(Quat::from_euler(
             EulerRot::YXZ,
             initial_yaw,
             initial_pitch,
@@ -357,7 +417,7 @@ fn setup_scene(
 
     commands.spawn((
         DirectionalLight {
-            illuminance: 150000.0, // Very bright
+            illuminance: 150000.0,  // Very bright
             shadows_enabled: false, // Disable shadows for better visibility
             ..default()
         },
@@ -374,7 +434,7 @@ fn setup_scene(
             // Create shared material for all chunks to reduce resource usage
             let chunk_material = materials.add(StandardMaterial {
                 base_color_texture: Some(texture_atlas.atlas_handle.clone()),
-                alpha_mode: AlphaMode::Blend,
+                alpha_mode: AlphaMode::Mask(0.5),
                 ..default()
             });
 
@@ -425,7 +485,7 @@ fn setup_scene(
     // Create shared material for all chunks to reduce resource usage
     let chunk_material = materials.add(StandardMaterial {
         base_color_texture: Some(texture_atlas.atlas_handle.clone()),
-        alpha_mode: AlphaMode::Blend,
+        alpha_mode: AlphaMode::Mask(0.5),
         ..default()
     });
 

@@ -118,12 +118,7 @@ fn spawn_settings_screen(commands: &mut Commands, config: &Config) {
                     add_section_header(parent, "Audio");
 
                     // Master Volume Setting
-                    add_setting_row(
-                        parent,
-                        "Master Volume",
-                        "100%",
-                        SettingSlider::MasterVolume,
-                    );
+                    add_setting_row(parent, "Master Volume", "100%", SettingSlider::MasterVolume);
 
                     // Close button
                     parent
@@ -146,7 +141,7 @@ fn spawn_settings_screen(commands: &mut Commands, config: &Config) {
                                 TextFont {
                                     font_size: 24.0,
                                     ..default()
-                        },
+                                },
                                 TextColor(Color::WHITE),
                             ));
                         });

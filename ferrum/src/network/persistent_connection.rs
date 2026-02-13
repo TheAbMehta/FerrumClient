@@ -1,7 +1,6 @@
 use azalea_protocol::packets::game::{
     s_chunk_batch_received::ServerboundChunkBatchReceived,
-    s_keep_alive::ServerboundKeepAlive as GameServerboundKeepAlive,
-    ClientboundGamePacket,
+    s_keep_alive::ServerboundKeepAlive as GameServerboundKeepAlive, ClientboundGamePacket,
 };
 use bevy::prelude::*;
 use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
@@ -69,7 +68,10 @@ pub fn handle_incoming_packets(
                 // TODO: Handle disconnection properly
             }
             _ => {
-                trace!("Unhandled packet: {:?}", std::any::type_name_of_val(&packet));
+                trace!(
+                    "Unhandled packet: {:?}",
+                    std::any::type_name_of_val(&packet)
+                );
             }
         }
     }

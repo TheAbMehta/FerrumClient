@@ -16,16 +16,11 @@ impl Plugin for ScreenshotPlugin {
 }
 
 /// System that captures screenshot when F2 is pressed
-fn capture_screenshot(
-    input: Res<ButtonInput<KeyCode>>,
-) {
+fn capture_screenshot(input: Res<ButtonInput<KeyCode>>) {
     if input.just_pressed(KeyCode::F2) {
         // Generate filename with timestamp
         let now = chrono::Local::now();
-        let filename = format!(
-            "screenshots/{}.png",
-            now.format("%Y-%m-%d_%H.%M.%S")
-        );
+        let filename = format!("screenshots/{}.png", now.format("%Y-%m-%d_%H.%M.%S"));
 
         info!("Screenshot requested: {}", filename);
         // TODO: Implement actual screenshot capture using Bevy's screenshot API

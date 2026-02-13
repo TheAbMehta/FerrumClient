@@ -11,7 +11,9 @@ pub use connection::{connect_and_play, connect_persistent, ConnectionError, Rece
 pub use entity_sync::{EntitySync, EntitySyncPlugin};
 pub use handshake::perform_handshake;
 pub use login::perform_login;
-pub use persistent_connection::{handle_incoming_packets, PersistentConnectionPlugin, ServerConnection};
+pub use persistent_connection::{
+    handle_incoming_packets, PersistentConnectionPlugin, ServerConnection,
+};
 pub use player_position::{
     create_position_packet, create_position_rotation_packet, create_status_only_packet,
     PlayerPositionPlugin, PlayerPositionTracker,

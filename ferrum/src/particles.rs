@@ -101,10 +101,7 @@ pub fn spawn_particle_burst(
 }
 
 /// System that updates particle positions and lifetimes
-fn update_particles(
-    time: Res<Time>,
-    mut particles: Query<(&mut Transform, &mut Particle)>,
-) {
+fn update_particles(time: Res<Time>, mut particles: Query<(&mut Transform, &mut Particle)>) {
     let delta = time.delta_secs();
 
     for (mut transform, mut particle) in &mut particles {
@@ -127,10 +124,7 @@ fn update_particles(
 }
 
 /// System that removes particles whose lifetime has expired
-fn cleanup_dead_particles(
-    mut commands: Commands,
-    particles: Query<(Entity, &Particle)>,
-) {
+fn cleanup_dead_particles(mut commands: Commands, particles: Query<(Entity, &Particle)>) {
     for (entity, particle) in &particles {
         if particle.lifetime.just_finished() {
             commands.entity(entity).despawn();
