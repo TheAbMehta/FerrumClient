@@ -191,7 +191,7 @@ fn async_connection_system(
                     .expect("Failed to create tokio runtime")
                     .block_on(async {
                         let connection_future = network::connect_and_play(address.clone());
-                        match tokio::time::timeout(Duration::from_secs(5), connection_future).await
+                        match tokio::time::timeout(Duration::from_secs(30), connection_future).await
                         {
                             Ok(Ok(received_chunks)) => Some(received_chunks),
                             Ok(Err(e)) => {
@@ -199,7 +199,7 @@ fn async_connection_system(
                                 None
                             }
                             Err(_) => {
-                                eprintln!("Connection timed out after 5 seconds");
+                                eprintln!("Connection timed out after 30 seconds");
                                 None
                             }
                         }
