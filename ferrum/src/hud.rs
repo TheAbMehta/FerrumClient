@@ -1,5 +1,7 @@
 use crate::title_screen::GameState;
+use bevy::core_pipeline::core_2d::graph::Core2d;
 use bevy::prelude::*;
+use bevy::render::camera::CameraRenderGraph;
 
 pub struct HudPlugin;
 
@@ -73,6 +75,7 @@ fn setup_hud(mut commands: Commands) {
             order: 1,
             ..default()
         },
+        CameraRenderGraph::new(Core2d),
     ));
 
     commands
