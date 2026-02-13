@@ -5,7 +5,7 @@ vsync = false
 
 [server]
 address = "127.0.0.1:25565"
-auto_start = false
+auto_start = true
 
 [assets]
 source = "mojang"

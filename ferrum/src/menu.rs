@@ -617,11 +617,31 @@ fn toggle_menu(
 fn handle_pause_buttons(
     mut interaction_query: Query<(&Interaction, &MenuButton), (Changed<Interaction>, With<Button>)>,
     mut menu_state: ResMut<MenuState>,
-    mut pause_container: Query<&mut Visibility, With<PauseMenuContainer>>,
+    mut menu_root: Query<
+        &mut Visibility,
+        (
+            With<MenuRoot>,
+            Without<PauseMenuContainer>,
+            Without<SettingsMenuContainer>,
+        ),
+    >,
+    mut pause_container: Query<
+        &mut Visibility,
+        (
+            With<PauseMenuContainer>,
+            Without<MenuRoot>,
+            Without<SettingsMenuContainer>,
+        ),
+    >,
     mut settings_container: Query<
         &mut Visibility,
-        (With<SettingsMenuContainer>, Without<PauseMenuContainer>),
+        (
+            With<SettingsMenuContainer>,
+            Without<MenuRoot>,
+            Without<PauseMenuContainer>,
+        ),
     >,
+    mut cursor_options: Single<&mut CursorOptions>,
     mut app_exit: MessageWriter<AppExit>,
 ) {
     for (interaction, button) in &mut interaction_query {
@@ -629,7 +649,11 @@ fn handle_pause_buttons(
             match button {
                 MenuButton::Resume => {
                     menu_state.is_open = false;
-                    // Menu will be hidden by toggle_menu system
+                    if let Some(mut vis) = menu_root.iter_mut().next() {
+                        *vis = Visibility::Hidden;
+                    }
+                    cursor_options.grab_mode = CursorGrabMode::Locked;
+                    cursor_options.visible = false;
                 }
                 MenuButton::Settings => {
                     menu_state.current_screen = MenuScreen::Settings;
