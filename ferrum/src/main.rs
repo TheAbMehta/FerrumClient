@@ -157,7 +157,8 @@ fn async_connection_system(
             if config.server.auto_start {
                 let pumpkin_path = PathBuf::from("./pumpkin-server/target/release/pumpkin");
                 if pumpkin_path.exists() {
-                    match Command::new(&pumpkin_path)
+                    let abs_path = pumpkin_path.canonicalize().unwrap_or(pumpkin_path.clone());
+                    match Command::new(&abs_path)
                         .current_dir("./pumpkin-server")
                         .spawn()
                     {
@@ -184,6 +185,8 @@ fn async_connection_system(
             let (tx, rx) = mpsc::channel();
             let address = config.server.address.clone();
             thread::spawn(move || {
+                // Give Pumpkin server time to start before connecting
+                thread::sleep(Duration::from_secs(3));
                 let result = tokio::runtime::Runtime::new()
                     .expect("Failed to create tokio runtime")
                     .block_on(async {
@@ -356,14 +359,20 @@ fn setup_scene(
     texture_atlas: Option<Res<texture_loader::BlockTextureAtlas>>,
     mut scene_setup: ResMut<SceneSetup>,
     game_state: Res<State<title_screen::GameState>>,
+    conn_state: Res<ConnectionState>,
 ) {
-    // Only run in InGame state
     if *game_state.get() != title_screen::GameState::InGame {
         return;
     }
 
+    if matches!(
+        conn_state.phase,
+        ConnectionPhase::NotStarted | ConnectionPhase::Connecting
+    ) {
+        return;
+    }
+
     let Some(texture_atlas) = texture_atlas else {
-        // Texture atlas not loaded yet, will retry next frame
         return;
     };
     let initial_yaw = 0.0;
