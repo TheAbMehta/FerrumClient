@@ -7,7 +7,7 @@ pub mod persistent_connection;
 pub mod player_position;
 
 pub use chunk_loader::{ChunkLoader, ChunkLoaderError};
-pub use connection::{connect_and_play, connect_persistent, ConnectionError, ReceivedChunks};
+pub use connection::{connect_and_play, ConnectionError, ReceivedChunks};
 pub use entity_sync::{EntitySync, EntitySyncPlugin};
 pub use handshake::perform_handshake;
 pub use login::perform_login;
