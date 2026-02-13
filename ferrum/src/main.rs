@@ -114,7 +114,9 @@ fn main() {
         .add_plugins(block_interact::BlockInteractPlugin)
         .add_plugins(inventory_screen::InventoryPlugin)
         .add_plugins(entity_renderer::EntityRenderPlugin)
-        .add_plugins(sounds::SoundPlugin)
+        // SoundPlugin disabled: procedural WAV generation triggers rodio UnrecognizedFormat panic
+        // TODO: Fix WAV byte generation or switch to .ogg asset files
+        // .add_plugins(sounds::SoundPlugin)
         // Network/Multiplayer plugins
         .add_plugins(network::PersistentConnectionPlugin)
         .add_plugins(network::EntitySyncPlugin)
