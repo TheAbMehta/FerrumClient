@@ -5,7 +5,8 @@ use ferrum_physics::movement::MovementInput;
 use ferrum_physics::Player;
 
 const EYE_HEIGHT: f32 = 1.62;
-const GROUND_LEVEL: f32 = 17.0; // TODO: Replace with proper chunk-based collision detection
+const FEET_TO_GROUND_OFFSET: f32 = 0.5;
+const DEFAULT_GROUND_LEVEL: f32 = 17.0; // TODO: Replace with proper chunk-based collision detection
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
@@ -19,16 +20,25 @@ pub struct PlayerState {
     game_mode: GameMode,
     is_flying: bool,
     fly_speed: f32,
+    pub ground_level: f32,
 }
 
 impl Default for PlayerState {
     fn default() -> Self {
         Self {
-            player: Player::new(Vec3::new(0.0, 20.0, 0.0)),
+            player: Player::new(Vec3::new(0.0, 80.0, 0.0)),
             game_mode: GameMode::Survival,
             is_flying: false,
             fly_speed: 20.0,
+            ground_level: DEFAULT_GROUND_LEVEL,
         }
+    }
+}
+
+impl PlayerState {
+    pub fn set_spawn_position(&mut self, position: Vec3) {
+        self.player.set_position(position);
+        self.ground_level = position.y - FEET_TO_GROUND_OFFSET;
     }
 }
 
@@ -239,11 +249,11 @@ fn player_collision(mut state: ResMut<PlayerState>) {
     // Simple ground plane collision at GROUND_LEVEL
     let player_pos = state.player.position();
 
-    if player_pos.y <= GROUND_LEVEL {
+    if player_pos.y <= state.ground_level {
         // Player is at or below ground — snap to ground, zero vertical velocity, mark
         // grounded
         let mut pos = player_pos;
-        pos.y = GROUND_LEVEL;
+        pos.y = state.ground_level;
         state.player.set_position(pos);
 
         let mut vel = state.player.velocity();
@@ -253,7 +263,7 @@ fn player_collision(mut state: ResMut<PlayerState>) {
         state.player.set_velocity(vel);
 
         state.player.set_on_ground(true);
-    } else if player_pos.y <= GROUND_LEVEL + 0.05 {
+    } else if player_pos.y <= state.ground_level + 0.05 {
         // Very close to ground — still grounded (prevents jitter)
         state.player.set_on_ground(true);
     } else {

@@ -360,6 +360,7 @@ fn setup_scene(
     mut scene_setup: ResMut<SceneSetup>,
     game_state: Res<State<title_screen::GameState>>,
     conn_state: Res<ConnectionState>,
+    mut player_state: ResMut<player_controller::PlayerState>,
 ) {
     if *game_state.get() != title_screen::GameState::InGame {
         return;
@@ -375,16 +376,29 @@ fn setup_scene(
     let Some(texture_atlas) = texture_atlas else {
         return;
     };
+
+    let spawn_pos = received_chunks
+        .as_ref()
+        .and_then(|chunks| chunks.spawn_position)
+        .map(|[x, y, z]| Vec3::new(x as f32, y as f32, z as f32))
+        .unwrap_or_else(|| {
+            warn!("No spawn position from server, defaulting to Y=80");
+            Vec3::new(0.0, 80.0, 0.0)
+        });
+
+    let camera_pos = Vec3::new(spawn_pos.x, spawn_pos.y + 1.62, spawn_pos.z);
+    info!(
+        "Camera spawn at ({:.1}, {:.1}, {:.1})",
+        camera_pos.x, camera_pos.y, camera_pos.z
+    );
+
     let initial_yaw = 0.0;
     let initial_pitch = -std::f32::consts::FRAC_PI_6; // Look down less steeply
     commands.spawn((
         Camera3d::default(),
-        Transform::from_xyz(0.0, 20.0, 0.0).with_rotation(Quat::from_euler(
-            EulerRot::YXZ,
-            initial_yaw,
-            initial_pitch,
-            0.0,
-        )),
+        Transform::from_xyz(camera_pos.x, camera_pos.y, camera_pos.z).with_rotation(
+            Quat::from_euler(EulerRot::YXZ, initial_yaw, initial_pitch, 0.0),
+        ),
         player_controller::PlayerCamera {
             yaw: initial_yaw,
             pitch: initial_pitch,
@@ -400,6 +414,8 @@ fn setup_scene(
             directional_light_exponent: 10.0,
         },
     ));
+
+    player_state.set_spawn_position(spawn_pos);
 
     commands.spawn((
         DirectionalLight {
