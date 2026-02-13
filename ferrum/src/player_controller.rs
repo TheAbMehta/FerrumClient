@@ -1,7 +1,6 @@
 use crate::title_screen::GameState;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
-use ferrum_physics::collision::Aabb;
 use ferrum_physics::movement::MovementInput;
 use ferrum_physics::Player;
 
@@ -237,19 +236,25 @@ fn player_collision(mut state: ResMut<PlayerState>) {
         return;
     }
 
-    // TODO: Replace with proper chunk-based collision detection
+    // Simple ground plane collision at GROUND_LEVEL
     let player_pos = state.player.position();
 
-    let ground_aabb = Aabb::new(
-        Vec3::new(-1000.0, GROUND_LEVEL - 1.0, -1000.0),
-        Vec3::new(1000.0, GROUND_LEVEL, 1000.0),
-    );
+    if player_pos.y <= GROUND_LEVEL {
+        // Player is at or below ground — snap to ground, zero vertical velocity, mark
+        // grounded
+        let mut pos = player_pos;
+        pos.y = GROUND_LEVEL;
+        state.player.set_position(pos);
 
-    if state.player.check_collision(&ground_aabb) {
-        state.player.resolve_collision(&ground_aabb);
-    }
+        let mut vel = state.player.velocity();
+        if vel.y < 0.0 {
+            vel.y = 0.0;
+        }
+        state.player.set_velocity(vel);
 
-    if player_pos.y <= GROUND_LEVEL + 0.1 {
+        state.player.set_on_ground(true);
+    } else if player_pos.y <= GROUND_LEVEL + 0.05 {
+        // Very close to ground — still grounded (prevents jitter)
         state.player.set_on_ground(true);
     } else {
         state.player.set_on_ground(false);
