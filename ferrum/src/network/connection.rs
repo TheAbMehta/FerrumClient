@@ -209,6 +209,13 @@ pub async fn connect_and_play(address: String) -> Result<ReceivedChunks, Connect
                         disconnect.reason
                     )));
                 }
+                ClientboundLoginPacket::Hello(_) => {
+                    return Err(ConnectionError::LoginFailed(
+                        "Server sent EncryptionRequest (online_mode is enabled). Configure server \
+                         with online_mode=false and encryption=false"
+                            .to_string(),
+                    ));
+                }
                 _ => {
                     debug!("Unhandled login packet: {:?}", packet);
                 }
@@ -389,6 +396,7 @@ pub async fn connect_persistent(
         .ok_or_else(|| ConnectionError::HandshakeFailed("Failed to resolve address".to_string()))?;
 
     // Phase 1: Handshake
+
     info!("Phase 1: Handshake");
     let mut conn =
         Connection::<ClientboundHandshakePacket, ServerboundHandshakePacket>::new(&socket_addr)
@@ -446,6 +454,13 @@ pub async fn connect_persistent(
                         "Server disconnected: {:?}",
                         disconnect.reason
                     )));
+                }
+                ClientboundLoginPacket::Hello(_) => {
+                    return Err(ConnectionError::LoginFailed(
+                        "Server sent EncryptionRequest (online_mode is enabled). Configure server \
+                         with online_mode=false and encryption=false"
+                            .to_string(),
+                    ));
                 }
                 _ => {
                     debug!("Unhandled login packet: {:?}", packet);
