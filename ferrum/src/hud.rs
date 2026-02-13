@@ -1,4 +1,5 @@
 use crate::title_screen::GameState;
+use bevy::camera::ClearColorConfig;
 use bevy::core_pipeline::core_2d::graph::Core2d;
 use bevy::prelude::*;
 use bevy::render::camera::CameraRenderGraph;
@@ -73,6 +74,7 @@ fn setup_hud(mut commands: Commands) {
         HudCamera,
         Camera {
             order: 1,
+            clear_color: ClearColorConfig::None,
             ..default()
         },
         CameraRenderGraph::new(Core2d),

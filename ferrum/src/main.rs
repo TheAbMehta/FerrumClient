@@ -18,6 +18,7 @@ mod weather;
 
 use azalea_block::BlockState;
 use azalea_registry::builtin::BlockKind;
+use bevy::image::ImagePlugin;
 use bevy::pbr::{DistanceFog, FogFalloff};
 use bevy::prelude::*;
 use bevy::render::alpha::AlphaMode;
@@ -97,7 +98,8 @@ fn main() {
                     }
                     .into(),
                     ..default()
-                }),
+                })
+                .set(ImagePlugin::default_nearest()),
         )
         .add_plugins(ConfigPlugin {
             config_path: "config.toml".into(),
@@ -436,7 +438,7 @@ fn setup_scene(
             // Create shared material for all chunks to reduce resource usage
             let chunk_material = materials.add(StandardMaterial {
                 base_color_texture: Some(texture_atlas.atlas_handle.clone()),
-                alpha_mode: AlphaMode::Mask(0.5),
+                alpha_mode: AlphaMode::Opaque,
                 ..default()
             });
 
@@ -487,7 +489,7 @@ fn setup_scene(
     // Create shared material for all chunks to reduce resource usage
     let chunk_material = materials.add(StandardMaterial {
         base_color_texture: Some(texture_atlas.atlas_handle.clone()),
-        alpha_mode: AlphaMode::Mask(0.5),
+        alpha_mode: AlphaMode::Opaque,
         ..default()
     });
 
