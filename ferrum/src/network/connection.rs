@@ -69,6 +69,7 @@ pub struct ReceivedChunks {
     pub chunks: HashMap<(i32, i32), Vec<Vec<Vec<u16>>>>,
     pub dimension_height: u32,
     pub min_y: i32,
+    pub spawn_position: Option<[f64; 3]>,
 }
 
 impl ReceivedChunks {
@@ -77,6 +78,7 @@ impl ReceivedChunks {
             chunks: HashMap::new(),
             dimension_height: 384,
             min_y: -64,
+            spawn_position: None,
         }
     }
 
@@ -321,7 +323,29 @@ pub async fn connect_and_play(address: String) -> Result<ReceivedChunks, Connect
                         .map_err(|_| ConnectionError::PacketWriteFailed)?;
                 }
                 ClientboundGamePacket::PlayerPosition(pos) => {
-                    info!("PlayerPosition: teleport_id={}", pos.id);
+                    let spawn_x = pos.change.pos.x;
+                    let spawn_y = pos.change.pos.y;
+                    let spawn_z = pos.change.pos.z;
+
+                    if received_chunks.spawn_position.is_none() {
+                        if pos.relative.x || pos.relative.y || pos.relative.z {
+                            warn!(
+                                "PlayerPosition has relative flags set for initial spawn, using \
+                                 as absolute"
+                            );
+                        }
+                        received_chunks.spawn_position = Some([spawn_x, spawn_y, spawn_z]);
+                        info!(
+                            "PlayerPosition: spawn=({:.1}, {:.1}, {:.1}), teleport_id={}",
+                            spawn_x, spawn_y, spawn_z, pos.id
+                        );
+                    } else {
+                        info!(
+                            "PlayerPosition: teleport_id={} (spawn already set, ignoring position)",
+                            pos.id
+                        );
+                    }
+
                     conn.write(ServerboundAcceptTeleportation { id: pos.id })
                         .await
                         .map_err(|_| ConnectionError::PacketWriteFailed)?;
