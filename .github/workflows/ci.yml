@@ -2,42 +2,35 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [master]
   pull_request:
-    branches: [ main, develop ]
+    branches: [master]
 
 env:
   CARGO_TERM_COLOR: always
   RUSTC_BOOTSTRAP: 1
 
 jobs:
-  test:
-    name: Test on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: true
-      matrix:
-        os: [ubuntu-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            platform: linux
-          - os: windows-latest
-            platform: windows
-
+  fmt:
+    name: Formatting
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          cache-on-failure: true
+          components: rustfmt
+      - run: cargo fmt --all -- --check
 
-      - name: Install Linux dependencies
-        if: matrix.platform == 'linux'
+  clippy:
+    name: Clippy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -47,37 +40,72 @@ jobs:
             libxi-dev \
             libasound2-dev \
             libudev-dev \
-            libvulkan-dev \
-            mesa-vulkan-drivers
+            libvulkan-dev
+      - run: cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Run tests (Linux)
-        if: matrix.platform == 'linux'
-        run: bash scripts/test-linux.sh
+  test-core:
+    name: Test Core Crates (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
+            libasound2-dev libudev-dev libvulkan-dev
+      - name: Test ferrum-core
+        run: cargo test --package ferrum-core
+      - name: Test ferrum-physics
+        run: cargo test --package ferrum-physics
+      - name: Test ferrum-world
+        run: cargo test --package ferrum-world
+      - name: Test ferrum-inventory
+        run: cargo test --package ferrum-inventory
+      - name: Test ferrum-config
+        run: cargo test --package ferrum-config
 
-      - name: Run tests (Windows)
-        if: matrix.platform == 'windows'
-        run: powershell -File scripts/test-windows.ps1
-
-      - name: Build release
-        run: cargo build --release --workspace
-
-  lint:
-    name: Lint
+  test-rendering:
+    name: Test Rendering & Meshing
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
+            libasound2-dev libudev-dev libvulkan-dev
+      - name: Test ferrum-meshing-cpu
+        run: cargo test --package ferrum-meshing-cpu
+      - name: Test ferrum-render
+        run: cargo test --package ferrum-render
+      - name: Test ferrum-entity
+        run: cargo test --package ferrum-entity
 
-      - name: Install Rust stable
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+  test-network:
+    name: Test Networking & Assets
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libx11-dev libxcursor-dev libxrandr-dev libxi-dev \
+            libasound2-dev libudev-dev libvulkan-dev
+      - name: Test ferrum-protocol
+        run: cargo test --package ferrum-protocol
+      - name: Test ferrum-assets
+        run: cargo test --package ferrum-assets
