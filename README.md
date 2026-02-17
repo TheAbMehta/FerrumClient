@@ -1,5 +1,9 @@
 # Ferrum - High-Performance Minecraft Client
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Rust](https://img.shields.io/badge/rust-stable-orange.svg)](https://www.rust-lang.org/)
+[![Bevy](https://img.shields.io/badge/bevy-0.18-blue.svg)](https://bevyengine.org/)
+
 A blazingly fast Minecraft client written in Rust, targeting extreme performance (240+ FPS, 64 chunk render distance, <2GB RAM) using Bevy engine and Pumpkin-MC backend.
 
 ## Why This Exists
@@ -25,13 +29,13 @@ I chose Bevy because it's ECS-first and Rust native. Pumpkin because it's a soli
 - Block interaction (break/place)
 - Inventory system with crafting and combat
 - CPU chunk meshing (64µs/chunk, meets Phase 1 target)
-
+- Lighting system with ambient occlusion (24/24 tests passing)
 - Networking (connection, chunk loading, entity sync)
 - Cross-platform CI (Linux + Windows)
 
-### What's Blocked ⚠️
-- Lighting system (4/15 tests failing)
+### In Progress 🔧
 - Full integration testing (Bevy compilation timeout)
+- GPU compute meshing pipeline
 
 ## Quick Start
 
@@ -170,7 +174,7 @@ cargo clippy
 
 2. **Bevy Compilation**: Takes 120+ seconds. Be patient or test individual crates.
 
-3. **Lighting System**: 4/15 tests failing in ferrum-render. See `HANDOFF.md` for details.
+3. **Bevy Linking**: Some platforms may need `lld` or `mold` linker for faster builds. See [Bevy setup guide](https://bevyengine.org/learn/quick-start/getting-started/setup/).
 
 ## Documentation
 
@@ -189,7 +193,7 @@ See `HANDOFF.md` for:
 
 ## License
 
-(To be determined - MIT or Apache-2.0 recommended)
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
 
 ## Credits
 
@@ -207,4 +211,4 @@ For questions or issues:
 
 ---
 
-**Status**: 🟡 Blocked by lighting system bugs, otherwise production-ready for core gameplay.
+**Status**: 🟢 Core gameplay systems operational. Lighting engine fully passing. GPU meshing in progress.

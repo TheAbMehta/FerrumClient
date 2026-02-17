@@ -1,5 +1,8 @@
 use crate::title_screen::GameState;
+use bevy::camera::ClearColorConfig;
+use bevy::core_pipeline::core_2d::graph::Core2d;
 use bevy::prelude::*;
+use bevy::render::camera::CameraRenderGraph;
 
 pub struct HudPlugin;
 
@@ -45,6 +48,9 @@ impl Default for HudState {
 }
 
 #[derive(Component)]
+struct HudCamera;
+
+#[derive(Component)]
 struct Crosshair;
 
 #[derive(Component)]
@@ -63,7 +69,17 @@ struct XpBar;
 struct DebugOverlay;
 
 fn setup_hud(mut commands: Commands) {
-    // Root UI container (Camera3d from main scene handles UI rendering)
+    commands.spawn((
+        Camera2d,
+        HudCamera,
+        Camera {
+            order: 1,
+            clear_color: ClearColorConfig::None,
+            ..default()
+        },
+        CameraRenderGraph::new(Core2d),
+    ));
+
     commands
         .spawn(Node {
             width: Val::Percent(100.0),

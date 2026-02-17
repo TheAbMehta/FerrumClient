@@ -1,11 +1,12 @@
+use crate::title_screen::GameState;
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
-use ferrum_physics::collision::Aabb;
 use ferrum_physics::movement::MovementInput;
 use ferrum_physics::Player;
 
 const EYE_HEIGHT: f32 = 1.62;
-const GROUND_LEVEL: f32 = 64.0; // TODO: Replace with proper chunk-based collision detection
+const FEET_TO_GROUND_OFFSET: f32 = 0.5;
+const DEFAULT_GROUND_LEVEL: f32 = 17.0; // TODO: Replace with proper chunk-based collision detection
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
@@ -19,16 +20,25 @@ pub struct PlayerState {
     game_mode: GameMode,
     is_flying: bool,
     fly_speed: f32,
+    pub ground_level: f32,
 }
 
 impl Default for PlayerState {
     fn default() -> Self {
         Self {
-            player: Player::new(Vec3::new(0.0, 100.0, 0.0)),
+            player: Player::new(Vec3::new(0.0, 80.0, 0.0)),
             game_mode: GameMode::Survival,
             is_flying: false,
             fly_speed: 20.0,
+            ground_level: DEFAULT_GROUND_LEVEL,
         }
+    }
+}
+
+impl PlayerState {
+    pub fn set_spawn_position(&mut self, position: Vec3) {
+        self.player.set_position(position);
+        self.ground_level = position.y - FEET_TO_GROUND_OFFSET;
     }
 }
 
@@ -64,7 +74,8 @@ impl Plugin for PlayerControllerPlugin {
                 player_collision,
                 update_camera_position,
             )
-                .chain(),
+                .chain()
+                .run_if(in_state(GameState::InGame)),
         );
     }
 }
@@ -163,8 +174,8 @@ fn player_movement(
 
             if state.player.on_ground() {
                 let target_velocity = movement_direction * speed;
-                let acceleration = 0.098;
-                let friction = 0.546;
+                let acceleration = 0.6;
+                let friction = 0.91;
 
                 let mut new_velocity = current_velocity;
                 new_velocity.x += (target_velocity.x - current_velocity.x) * acceleration;
@@ -235,19 +246,25 @@ fn player_collision(mut state: ResMut<PlayerState>) {
         return;
     }
 
-    // TODO: Replace with proper chunk-based collision detection
+    // Simple ground plane collision at GROUND_LEVEL
     let player_pos = state.player.position();
 
-    let ground_aabb = Aabb::new(
-        Vec3::new(-1000.0, GROUND_LEVEL - 1.0, -1000.0),
-        Vec3::new(1000.0, GROUND_LEVEL, 1000.0),
-    );
+    if player_pos.y <= state.ground_level {
+        // Player is at or below ground — snap to ground, zero vertical velocity, mark
+        // grounded
+        let mut pos = player_pos;
+        pos.y = state.ground_level;
+        state.player.set_position(pos);
 
-    if state.player.check_collision(&ground_aabb) {
-        state.player.resolve_collision(&ground_aabb);
-    }
+        let mut vel = state.player.velocity();
+        if vel.y < 0.0 {
+            vel.y = 0.0;
+        }
+        state.player.set_velocity(vel);
 
-    if player_pos.y <= GROUND_LEVEL + 0.1 {
+        state.player.set_on_ground(true);
+    } else if player_pos.y <= state.ground_level + 0.05 {
+        // Very close to ground — still grounded (prevents jitter)
         state.player.set_on_ground(true);
     } else {
         state.player.set_on_ground(false);

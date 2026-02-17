@@ -42,8 +42,8 @@ pub struct DayNightCycle {
 impl Default for DayNightCycle {
     fn default() -> Self {
         Self {
-            time: 0.0,   // Start at sunrise
-            speed: 20.0, // 20 ticks/sec = 20 minute cycle
+            time: 6000.0, // Start at noon (brightest)
+            speed: 1.0,   // 1 tick/sec = slow cycle, daylight lasts ~100 real seconds
             sun_angle: 0.0,
             ambient_light: 0.5,
         }

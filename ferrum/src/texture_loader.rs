@@ -20,8 +20,11 @@ impl Plugin for TextureLoaderPlugin {
 fn load_real_textures(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
     info!("Loading real Minecraft textures...");
 
-    let texture_dir = PathBuf::from(std::env::var("HOME").unwrap())
-        .join(".ferrum/textures");
+    let texture_dir = PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| {
+        warn!("HOME env var not set, using /tmp");
+        "/tmp".to_string()
+    }))
+    .join(".ferrum/textures");
 
     // Load individual textures and create atlas
     let texture_files = vec![

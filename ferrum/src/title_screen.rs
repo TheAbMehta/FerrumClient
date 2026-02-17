@@ -12,7 +12,9 @@ impl Plugin for TitleScreenPlugin {
             .add_systems(OnExit(GameState::Loading), cleanup_loading_screen)
             .add_systems(
                 Update,
-                handle_title_buttons.run_if(in_state(GameState::TitleScreen)),
+                (tick_title_ready, handle_title_buttons)
+                    .chain()
+                    .run_if(in_state(GameState::TitleScreen)),
             )
             .add_systems(
                 Update,
@@ -27,6 +29,7 @@ pub enum GameState {
     TitleScreen,
     Loading,
     InGame,
+    Dead,
 }
 
 #[derive(Component)]
@@ -43,6 +46,9 @@ enum TitleButton {
     Quit,
 }
 
+#[derive(Resource)]
+struct TitleScreenReady(bool, f32);
+
 const BG_COLOR: Color = Color::srgb(0.05, 0.05, 0.08);
 const PANEL_BG: Color = Color::srgb(0.12, 0.12, 0.15);
 const BUTTON_NORMAL: Color = Color::srgb(0.18, 0.18, 0.22);
@@ -53,11 +59,9 @@ const TEXT_ACCENT: Color = Color::srgb(1.0, 0.85, 0.0);
 const BORDER_COLOR: Color = Color::srgb(0.4, 0.4, 0.45);
 
 fn setup_title_screen(mut commands: Commands) {
-    // Spawn a camera for the UI
-    commands.spawn((
-        Camera2d,
-        TitleScreenRoot,
-    ));
+    commands.insert_resource(TitleScreenReady(false, 0.0));
+
+    commands.spawn((Camera2d, TitleScreenRoot));
 
     commands
         .spawn((
@@ -257,10 +261,7 @@ fn cleanup_title_screen(mut commands: Commands, query: Query<Entity, With<TitleS
 
 fn setup_loading_screen(mut commands: Commands) {
     // Spawn a camera for the loading screen UI
-    commands.spawn((
-        Camera2d,
-        LoadingScreenRoot,
-    ));
+    commands.spawn((Camera2d, LoadingScreenRoot));
 
     commands
         .spawn((
@@ -294,7 +295,17 @@ fn cleanup_loading_screen(mut commands: Commands, query: Query<Entity, With<Load
     }
 }
 
+fn tick_title_ready(time: Res<Time>, mut ready: ResMut<TitleScreenReady>) {
+    if !ready.0 {
+        ready.1 += time.delta_secs();
+        if ready.1 >= 0.5 {
+            ready.0 = true;
+        }
+    }
+}
+
 fn handle_title_buttons(
+    ready: Res<TitleScreenReady>,
     mut interaction_query: Query<
         (&Interaction, &TitleButton, &mut BackgroundColor),
         (Changed<Interaction>, With<Button>),
@@ -302,6 +313,9 @@ fn handle_title_buttons(
     mut next_state: ResMut<NextState<GameState>>,
     mut app_exit: MessageWriter<AppExit>,
 ) {
+    if !ready.0 {
+        return;
+    }
     for (interaction, button, mut bg_color) in &mut interaction_query {
         match *interaction {
             Interaction::Pressed => {

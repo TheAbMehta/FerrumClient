@@ -5,11 +5,13 @@ use azalea_protocol::packets::game::{
     s_move_player_pos_rot::ServerboundMovePlayerPosRot,
     s_move_player_status_only::ServerboundMovePlayerStatusOnly,
 };
+use bevy::prelude::*;
 use glam::Vec3;
 use std::time::{Duration, Instant};
 
 const TICK_INTERVAL: Duration = Duration::from_millis(50);
 
+#[derive(Resource)]
 pub struct PlayerPositionTracker {
     last_update: Instant,
     last_position: Vec3,
@@ -86,6 +88,48 @@ pub fn create_status_only_packet(on_ground: bool) -> ServerboundMovePlayerStatus
             on_ground,
             horizontal_collision: false,
         },
+    }
+}
+
+/// Bevy system that sends player position updates to the server
+/// This should run every frame and will throttle updates internally
+pub fn send_player_position_updates(
+    mut tracker: ResMut<PlayerPositionTracker>,
+    player_query: Query<&Transform, With<Camera3d>>,
+) {
+    // Get player transform (using camera as player proxy)
+    let Ok(transform) = player_query.single() else {
+        return;
+    };
+
+    let current_position = transform.translation;
+
+    // Check if we should send an update
+    if !tracker.should_send_update() {
+        return;
+    }
+
+    // Check if position has actually changed
+    if !tracker.has_position_changed(current_position) {
+        return;
+    }
+
+    // TODO: Actually send the packet via ServerConnection
+    // For now, just log and update tracker
+    debug!("Would send position update: {:?}", current_position);
+
+    // Assume player is on ground for now (TODO: proper ground detection)
+    let on_ground = true;
+    tracker.update_state(current_position, on_ground);
+}
+
+/// Plugin for player position synchronization
+pub struct PlayerPositionPlugin;
+
+impl Plugin for PlayerPositionPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<PlayerPositionTracker>()
+            .add_systems(Update, send_player_position_updates);
     }
 }
 
