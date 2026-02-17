@@ -23,7 +23,7 @@ If you discover a security vulnerability in Ferrum, please report it responsibly
 ### How to Report
 
 1. **Do NOT** open a public GitHub issue for security vulnerabilities
-2. Contact the maintainers privately (details TBD)
+2. Use [GitHub Security Advisories](https://github.com/TheAbMehta/FerrumClient/security/advisories/new) to report privately
 3. Provide detailed information about the vulnerability:
    - Description of the issue
    - Steps to reproduce

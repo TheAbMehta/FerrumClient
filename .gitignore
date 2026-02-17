@@ -1,6 +1,6 @@
 # Rust build artifacts
 /target
-Cargo.lock
+# Note: Cargo.lock is intentionally tracked for reproducible builds (this is a binary project)
 
 # Sisyphus working directory
 .sisyphus/
